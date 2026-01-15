@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: court_backend
+    volumes:
+      - ./backend:/var/www
+    ports:
+      - "8000:8000"
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: court_scheduling
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: court_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:16
+    container_name: court_db
+    environment:
+      POSTGRES_DB: court_scheduling
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
