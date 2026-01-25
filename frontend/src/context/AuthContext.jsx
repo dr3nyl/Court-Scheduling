@@ -42,21 +42,33 @@ export function AuthProvider({ children }) {
 
   // Login function
   const login = async (email, password) => {
-    const res = await api.post("/login", { email, password });
+    try {
+      const res = await api.post("/login", { email, password });
 
-    setUser(res.data.user);
-    setToken(res.data.token);
-    localStorage.setItem("token", res.data.token);
+      setUser(res.data.user);
+      setToken(res.data.token);
+      localStorage.setItem("token", res.data.token);
 
-    return res.data.user;
+      return res.data.user;
+    } catch (err) {
+      // Re-throw error so components can handle it
+      throw err;
+    }
   };
 
   // Register function
   const register = async (data) => {
-    const res = await api.post("/register", data);
-    setUser(res.data.user);
-    setToken(res.data.token);
-    localStorage.setItem("token", res.data.token);
+    try {
+      const res = await api.post("/register", data);
+      setUser(res.data.user);
+      setToken(res.data.token);
+      localStorage.setItem("token", res.data.token);
+      
+      return res.data.user;
+    } catch (err) {
+      // Re-throw error so components can handle it
+      throw err;
+    }
   };
 
   // Logout function

@@ -12,6 +12,120 @@ use Illuminate\Support\Facades\Auth;
 class CourtBookingController extends Controller
 {
     /**
+     * List all bookings for the authenticated user
+     */
+    public function userBookings(Request $request)
+    {
+        $query = CourtBooking::where('user_id', Auth::id())
+            ->with('court:id,name')
+            ->orderBy('date', 'desc')
+            ->orderBy('start_time', 'desc');
+
+        // Filter by status if provided
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter upcoming vs past bookings
+        if ($request->has('upcoming') && $request->upcoming === 'true') {
+            $today = Carbon::today()->toDateString();
+            $query->where('date', '>=', $today)
+                  ->where('status', 'confirmed');
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * List all bookings for owner's courts
+     */
+    public function ownerBookings(Request $request)
+    {
+        $ownerId = Auth::id();
+        
+        // Get all court IDs owned by this user
+        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        
+        $query = CourtBooking::whereIn('court_id', $courtIds)
+            ->with(['court:id,name', 'user:id,name,email'])
+            ->orderBy('date', 'desc')
+            ->orderBy('start_time', 'desc');
+
+        // Filter by status if provided
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date if provided
+        if ($request->has('date')) {
+            $query->where('date', $request->date);
+        }
+
+        // Filter upcoming vs past bookings
+        if ($request->has('upcoming') && $request->upcoming === 'true') {
+            $today = Carbon::today()->toDateString();
+            $query->where('date', '>=', $today)
+                  ->where('status', 'confirmed');
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Get owner statistics
+     */
+    public function ownerStats(Request $request)
+    {
+        $ownerId = Auth::id();
+        
+        // Get all court IDs owned by this user
+        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        
+        $today = Carbon::today()->toDateString();
+        $thisMonthStart = Carbon::now()->startOfMonth()->toDateString();
+        $thisWeekStart = Carbon::now()->startOfWeek()->toDateString();
+        
+        $totalCourts = $courtIds->count();
+        $activeCourts = Court::where('owner_id', $ownerId)
+            ->where('is_active', true)
+            ->count();
+        
+        $totalBookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('status', 'confirmed')
+            ->count();
+        
+        $todayBookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', $today)
+            ->where('status', 'confirmed')
+            ->count();
+        
+        $thisWeekBookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', '>=', $thisWeekStart)
+            ->where('status', 'confirmed')
+            ->count();
+        
+        $thisMonthBookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', '>=', $thisMonthStart)
+            ->where('status', 'confirmed')
+            ->count();
+        
+        $upcomingBookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', '>=', $today)
+            ->where('status', 'confirmed')
+            ->count();
+        
+        return response()->json([
+            'total_courts' => $totalCourts,
+            'active_courts' => $activeCourts,
+            'total_bookings' => $totalBookings,
+            'today_bookings' => $todayBookings,
+            'this_week_bookings' => $thisWeekBookings,
+            'this_month_bookings' => $thisMonthBookings,
+            'upcoming_bookings' => $upcomingBookings,
+        ]);
+    }
+
+    /**
      * List bookings of a court (optionally by date)
      */
     public function index(Request $request, Court $court)
@@ -40,11 +154,8 @@ class CourtBookingController extends Controller
             'end_time' => 'required|after:start_time',
         ]);
 
-
-
         // 1️⃣ Check weekly availability
         $dayOfWeek = Carbon::parse($request->date)->dayOfWeek;
-
 
         $availabilityExists = CourtAvailability::where('court_id', $court->id)
             ->where('day_of_week', $dayOfWeek)
@@ -63,12 +174,8 @@ class CourtBookingController extends Controller
             ->where('date', $request->date)
             ->where('status', 'confirmed')
             ->where(function ($q) use ($request) {
-                $q->whereBetween('start_time', [$request->start_time, $request->end_time])
-                  ->orWhereBetween('end_time', [$request->start_time, $request->end_time])
-                  ->orWhere(function ($q) use ($request) {
-                      $q->where('start_time', '<=', $request->start_time)
-                        ->where('end_time', '>=', $request->end_time);
-                  });
+                $q->where('start_time', '<=', $request->start_time)
+                    ->where('end_time', '>=', $request->end_time);
             })
             ->exists();
 

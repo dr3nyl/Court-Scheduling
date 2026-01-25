@@ -1,31 +1,141 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import api from "../services/api";
+import OwnerLayout from "../components/OwnerLayout";
 
 export default function OwnerCourtSchedule() {
   const { courtId } = useParams();
+  const navigate = useNavigate();
 
   const [schedules, setSchedules] = useState([]);
+  const [court, setCourt] = useState(null);
   const [dayOfWeek, setDayOfWeek] = useState("");
   const [openTime, setOpenTime] = useState("");
   const [closeTime, setCloseTime] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editOpenTime, setEditOpenTime] = useState("");
+  const [editCloseTime, setEditCloseTime] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    api.get(`/owner/courts/${courtId}/availability`)
-      .then(res => setSchedules(res.data));
+    loadData();
   }, [courtId]);
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [schedulesRes, courtsRes] = await Promise.all([
+        api.get(`/owner/courts/${courtId}/availability`),
+        api.get("/courts"),
+      ]);
+      setSchedules(schedulesRes.data);
+      const foundCourt = courtsRes.data.find((c) => c.id.toString() === courtId);
+      setCourt(foundCourt);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load schedule data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addSchedule = async () => {
-    const res = await api.post(`/owner/courts/${courtId}/availability`, {
+    if (!dayOfWeek || !openTime || !closeTime) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (openTime >= closeTime) {
+      setError("Close time must be after open time");
+      return;
+    }
+
+    // Check if schedule already exists for this day
+    if (schedules.some((s) => s.day_of_week === Number(dayOfWeek))) {
+      setError("A schedule already exists for this day. Please edit the existing one.");
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+      const res = await api.post(`/owner/courts/${courtId}/availability`, {
         day_of_week: Number(dayOfWeek),
         open_time: openTime,
-        close_time: closeTime
-    });
+        close_time: closeTime,
+      });
 
-    setSchedules([...schedules, res.data]);
-    setDayOfWeek("");
-    setOpenTime("");
-    setCloseTime("");
+      setSchedules([...schedules, res.data]);
+      setDayOfWeek("");
+      setOpenTime("");
+      setCloseTime("");
+      setSuccess("Schedule added successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to add schedule");
+    }
+  };
+
+  const startEdit = (schedule) => {
+    setEditingId(schedule.id);
+    setEditOpenTime(schedule.open_time);
+    setEditCloseTime(schedule.close_time);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditOpenTime("");
+    setEditCloseTime("");
+  };
+
+  const saveEdit = async (scheduleId) => {
+    if (!editOpenTime || !editCloseTime) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (editOpenTime >= editCloseTime) {
+      setError("Close time must be after open time");
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+      const res = await api.put(`/owner/courts/${courtId}/availability/${scheduleId}`, {
+        open_time: editOpenTime,
+        close_time: editCloseTime,
+      });
+
+      setSchedules(schedules.map((s) => (s.id === scheduleId ? res.data : s)));
+      setEditingId(null);
+      setSuccess("Schedule updated successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to update schedule");
+    }
+  };
+
+  const handleDelete = async (scheduleId) => {
+    if (!window.confirm("Are you sure you want to delete this schedule?")) {
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+      await api.delete(`/owner/courts/${courtId}/availability/${scheduleId}`);
+      setSchedules(schedules.filter((s) => s.id !== scheduleId));
+      setSuccess("Schedule deleted successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to delete schedule");
+    }
   };
 
   const dayName = (day) => {
@@ -33,45 +143,407 @@ export default function OwnerCourtSchedule() {
     return days[day];
   };
 
-return (
-    <div>
-        <h2>Court {courtId} Schedule</h2>
+  const dayShortName = (day) => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return days[day];
+  };
 
-        <select value={dayOfWeek} onChange={e => setDayOfWeek(e.target.value)}>
-            <option value="">Select day</option>
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-        </select>
+  // Create a map of day_of_week to schedule for easy lookup
+  const scheduleMap = {};
+  schedules.forEach((s) => {
+    scheduleMap[s.day_of_week] = s;
+  });
 
-        <input
-            type="time"
-            value={openTime}
-            onChange={e => setOpenTime(e.target.value)}
-        />
+  return (
+    <OwnerLayout>
+      {/* Page Header */}
+      <div style={{ marginBottom: "2rem" }}>
+        <button
+          onClick={() => navigate("/owner/courts")}
+          style={{
+            marginBottom: "1rem",
+            padding: "0.5rem 1rem",
+            backgroundColor: "#f3f4f6",
+            color: "#374151",
+            border: "none",
+            borderRadius: "0.375rem",
+            cursor: "pointer",
+            fontSize: "0.9rem",
+            fontWeight: 500,
+          }}
+        >
+          ← Back to Courts
+        </button>
+        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+          {court?.name || "Court"} Schedule
+        </h1>
+        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+          Set weekly availability hours for this court
+        </p>
+      </div>
 
-        <input
-            type="time"
-            value={closeTime}
-            onChange={e => setCloseTime(e.target.value)}
-        />
+      {/* Add Schedule Form */}
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: "0.75rem",
+          border: "1px solid #e5e7eb",
+          padding: "1.5rem",
+          marginBottom: "2rem",
+        }}
+      >
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
+          Add Schedule
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "#374151",
+                marginBottom: "0.5rem",
+              }}
+            >
+              Day of Week
+            </label>
+            <select
+              value={dayOfWeek}
+              onChange={(e) => {
+                setDayOfWeek(e.target.value);
+                setError("");
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.375rem",
+                border: "1px solid #d1d5db",
+                fontSize: "0.95rem",
+                backgroundColor: "#ffffff",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Select day</option>
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "#374151",
+                marginBottom: "0.5rem",
+              }}
+            >
+              Open Time
+            </label>
+            <input
+              type="time"
+              value={openTime}
+              onChange={(e) => {
+                setOpenTime(e.target.value);
+                setError("");
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.375rem",
+                border: "1px solid #d1d5db",
+                fontSize: "0.95rem",
+              }}
+            />
+          </div>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: "#374151",
+                marginBottom: "0.5rem",
+              }}
+            >
+              Close Time
+            </label>
+            <input
+              type="time"
+              value={closeTime}
+              onChange={(e) => {
+                setCloseTime(e.target.value);
+                setError("");
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.375rem",
+                border: "1px solid #d1d5db",
+                fontSize: "0.95rem",
+              }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <button
+              onClick={addSchedule}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "0.5rem 1rem",
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "0.375rem",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: 500,
+                fontSize: "0.95rem",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              Add Schedule
+            </button>
+          </div>
+        </div>
+      </div>
 
-        <button onClick={addSchedule}>Add</button>
+      {/* Status Messages */}
+      {error && (
+        <div
+          style={{
+            padding: "1rem",
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: "0.5rem",
+            color: "#b91c1c",
+            marginBottom: "1rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>{error}</span>
+          <button
+            onClick={() => setError("")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#b91c1c",
+              cursor: "pointer",
+              fontSize: "1.25rem",
+              padding: "0",
+              marginLeft: "1rem",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {success && (
+        <div
+          style={{
+            padding: "1rem",
+            backgroundColor: "#dcfce7",
+            border: "1px solid #86efac",
+            borderRadius: "0.5rem",
+            color: "#166534",
+            marginBottom: "1rem",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>{success}</span>
+          <button
+            onClick={() => setSuccess("")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#166534",
+              cursor: "pointer",
+              fontSize: "1.25rem",
+              padding: "0",
+              marginLeft: "1rem",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
-        <hr />
+      {/* Weekly Schedule View */}
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: "0.75rem",
+          border: "1px solid #e5e7eb",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ padding: "1.5rem", borderBottom: "1px solid #e5e7eb" }}>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827" }}>
+            Weekly Schedule
+          </h2>
+        </div>
 
-        <h3>Available Schedules</h3>
-        <ul>
-        {schedules.map(s => (
-        <li key={s.id}>
-            {dayName(s.day_of_week)} | {s.open_time} – {s.close_time}
-        </li>
-        ))}
-        </ul>
-    </div>
-    );
+        {loading ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "#6b7280" }}>
+            Loading schedule...
+          </div>
+        ) : schedules.length === 0 ? (
+          <div style={{ padding: "3rem", textAlign: "center" }}>
+            <p style={{ color: "#6b7280", marginBottom: "1rem" }}>
+              No schedules configured yet
+            </p>
+            <p style={{ color: "#9ca3af", fontSize: "0.9rem" }}>
+              Add schedules above to set availability for this court
+            </p>
+          </div>
+        ) : (
+          <div>
+            {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+              const schedule = scheduleMap[day];
+              const isEditing = schedule && editingId === schedule.id;
+
+              return (
+                <div
+                  key={day}
+                  style={{
+                    padding: "1.25rem 1.5rem",
+                    borderBottom: "1px solid #e5e7eb",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    transition: "background-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f9fafb";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#ffffff";
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.5rem" }}>
+                      {dayName(day)}
+                    </div>
+                    {isEditing ? (
+                      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="time"
+                          value={editOpenTime}
+                          onChange={(e) => setEditOpenTime(e.target.value)}
+                          style={{
+                            padding: "0.4rem 0.6rem",
+                            borderRadius: "0.375rem",
+                            border: "1px solid #d1d5db",
+                            fontSize: "0.9rem",
+                          }}
+                        />
+                        <span style={{ color: "#6b7280" }}>to</span>
+                        <input
+                          type="time"
+                          value={editCloseTime}
+                          onChange={(e) => setEditCloseTime(e.target.value)}
+                          style={{
+                            padding: "0.4rem 0.6rem",
+                            borderRadius: "0.375rem",
+                            border: "1px solid #d1d5db",
+                            fontSize: "0.9rem",
+                          }}
+                        />
+                      </div>
+                    ) : schedule ? (
+                      <div style={{ color: "#6b7280", fontSize: "0.95rem" }}>
+                        {schedule.open_time} - {schedule.close_time}
+                      </div>
+                    ) : (
+                      <div style={{ color: "#9ca3af", fontSize: "0.9rem", fontStyle: "italic" }}>
+                        No schedule set
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={() => saveEdit(schedule.id)}
+                          style={{
+                            padding: "0.4rem 0.75rem",
+                            backgroundColor: "#16a34a",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          style={{
+                            padding: "0.4rem 0.75rem",
+                            backgroundColor: "#f3f4f6",
+                            color: "#374151",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : schedule ? (
+                      <>
+                        <button
+                          onClick={() => startEdit(schedule)}
+                          style={{
+                            padding: "0.4rem 0.75rem",
+                            backgroundColor: "#f3f4f6",
+                            color: "#374151",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(schedule.id)}
+                          style={{
+                            padding: "0.4rem 0.75rem",
+                            backgroundColor: "#fee2e2",
+                            color: "#991b1b",
+                            border: "none",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </OwnerLayout>
+  );
 }

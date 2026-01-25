@@ -29,6 +29,8 @@ Route::middleware(['auth:sanctum', 'owner'])->group(function () {
     Route::get('/courts', [CourtController::class, 'index']);
     Route::post('/courts', [CourtController::class, 'store']);
     Route::patch('/courts/{court}', [CourtController::class, 'update']);
+    Route::get('/owner/bookings', [CourtBookingController::class, 'ownerBookings']);
+    Route::get('/owner/stats', [CourtBookingController::class, 'ownerStats']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -41,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     // Player-facing endpoint to get available courts with slots
     Route::get('/player/courts', [CourtController::class, 'availableForPlayers']);
+    Route::get('/player/bookings', [CourtBookingController::class, 'userBookings']);
     
     Route::get('/courts/{court}/bookings', [CourtBookingController::class, 'index']);
     Route::post('/courts/{court}/bookings', [CourtBookingController::class, 'store']);

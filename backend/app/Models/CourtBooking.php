@@ -14,4 +14,14 @@ class CourtBooking extends Model
         'end_time',
         'status'
     ];
+
+    public function court()
+    {
+        return $this->belongsTo(Court::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
