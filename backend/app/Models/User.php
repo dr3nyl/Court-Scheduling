@@ -48,4 +48,9 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function queueEntries()
+    {
+        return $this->hasMany(QueueEntry::class, 'user_id');
+    }
 }

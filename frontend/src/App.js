@@ -5,6 +5,7 @@ import Landing from "./pages/Landing";
 import PlayerDashboard from "./pages/PlayerDashboard";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import QueueMasterDashboard from "./pages/QueueMasterDashboard";
+import QueueSessionView from "./pages/QueueSessionView";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OwnerCourts from "./pages/OwnerCourts";
 import OwnerCourtSchedule from "./pages/OwnerCourtSchedule";
@@ -41,8 +42,16 @@ function App() {
         <Route
           path="/queue-master"
           element={
-            <ProtectedRoute role="queue_master">
+            <ProtectedRoute role={["owner", "queue_master"]}>
               <QueueMasterDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/queue-master/sessions/:sessionId"
+          element={
+            <ProtectedRoute role={["owner", "queue_master"]}>
+              <QueueSessionView />
             </ProtectedRoute>
           }
         />

@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'owner' => \App\Http\Middleware\EnsureOwner::class,
+            'queue_master_or_owner' => \App\Http\Middleware\EnsureQueueMasterOrOwner::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

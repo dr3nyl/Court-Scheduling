@@ -17,4 +17,9 @@ class Court extends Model
     {
         return $this->hasMany(CourtAvailability::class);
     }
+
+    public function queueMatches()
+    {
+        return $this->hasMany(QueueMatch::class);
+    }
 }
