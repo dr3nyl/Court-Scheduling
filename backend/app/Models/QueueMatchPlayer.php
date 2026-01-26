@@ -9,6 +9,7 @@ class QueueMatchPlayer extends Model
     protected $fillable = [
         'queue_match_id',
         'queue_entry_id',
+        'team',
     ];
 
     public function queueMatch()

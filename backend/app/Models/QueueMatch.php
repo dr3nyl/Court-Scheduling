@@ -12,6 +12,7 @@ class QueueMatch extends Model
         'status',
         'start_time',
         'end_time',
+        'shuttlecocks_used',
     ];
 
     protected function casts(): array

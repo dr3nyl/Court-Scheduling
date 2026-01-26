@@ -57,7 +57,10 @@ class QueueSessionController extends Controller
         $session->load([
             'owner:id,name',
             'entries' => fn ($q) => $q->with('user:id,name')->orderBy('joined_at'),
-            'matches' => fn ($q) => $q->where('status', 'active')->with('court:id,name'),
+            'matches' => fn ($q) => $q->where('status', 'active')->with([
+                'court:id,name',
+                'queueMatchPlayers' => fn ($q) => $q->with(['queueEntry' => fn ($eq) => $eq->with('user:id,name')]),
+            ]),
         ]);
 
         return $session;
@@ -87,6 +90,196 @@ class QueueSessionController extends Controller
                 $q->where('queue_session_id', $session->id)->where('status', 'active');
             })
             ->get(['id', 'name']);
+    }
+
+    /**
+     * Get all courts with their status (available or in-use) for visual display.
+     */
+    public function allCourts(Request $request, QueueSession $session)
+    {
+        $this->authorizeSession($request, $session);
+
+        $courts = Court::where('owner_id', $session->owner_id)
+            ->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true))
+            ->get(['id', 'name']);
+
+        // Get active matches for this session with players
+        $activeMatches = \App\Models\QueueMatch::where('queue_session_id', $session->id)
+            ->where('status', 'active')
+            ->with([
+                'court:id,name',
+                'queueMatchPlayers' => fn ($q) => $q->orderBy('team')->orderBy('id')->with(['queueEntry' => fn ($eq) => $eq->with('user:id,name')]),
+            ])
+            ->get();
+
+        $courtStatusMap = [];
+        foreach ($activeMatches as $match) {
+            $teamA = [];
+            $teamB = [];
+            
+            // Order by team, then by id to ensure consistent ordering
+            $sortedPlayers = $match->queueMatchPlayers->sortBy(function ($qmp) {
+                return ($qmp->team ?? 'A') . '_' . $qmp->id;
+            });
+            
+            foreach ($sortedPlayers as $qmp) {
+                $e = $qmp->queueEntry;
+                $name = $e ? ($e->user?->name ?? $e->guest_name ?? '') : '';
+                if ($name) {
+                    // Check team value (handle both string and null cases)
+                    $team = $qmp->team ?? null;
+                    // If team is null or empty, assign based on position (for old records)
+                    if (empty($team)) {
+                        // For old records without team, split by position
+                        $total = count($match->queueMatchPlayers);
+                        $currentIndex = $sortedPlayers->values()->search($qmp);
+                        $team = $currentIndex < ($total / 2) ? 'A' : 'B';
+                    }
+                    
+                    if (strtoupper($team) === 'A' || $team === 'A') {
+                        $teamA[] = $name;
+                    } else {
+                        $teamB[] = $name;
+                    }
+                }
+            }
+
+            $courtStatusMap[$match->court_id] = [
+                'id' => $match->id,
+                'players' => array_merge($teamA, $teamB), // Keep flat list for backward compatibility
+                'teamA' => $teamA,
+                'teamB' => $teamB,
+            ];
+        }
+
+        return $courts->map(function ($court) use ($courtStatusMap) {
+            $match = $courtStatusMap[$court->id] ?? null;
+            return [
+                'id' => $court->id,
+                'name' => $court->name,
+                'status' => $match ? 'in-use' : 'available',
+                'match' => $match,
+            ];
+        });
+    }
+
+    /**
+     * Suggest 4 players for a match (level-based, max spread 1.0). Doubles only.
+     * Body: { "court_id": int }. Returns { "suggested": [ { "queue_entry_id", "level", "name" } ] }.
+     */
+    public function suggestMatch(Request $request, QueueSession $session)
+    {
+        $this->authorizeSession($request, $session);
+
+        $request->validate(['court_id' => 'required|exists:courts,id']);
+        $courtId = (int) $request->court_id;
+
+        $availableCourtIds = Court::where('owner_id', $session->owner_id)
+            ->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true))
+            ->whereDoesntHave('queueMatches', function ($q) use ($session) {
+                $q->where('queue_session_id', $session->id)->where('status', 'active');
+            })
+            ->pluck('id')
+            ->all();
+        if (! in_array($courtId, $availableCourtIds, true)) {
+            return response()->json(['message' => 'Court is not available for this session.'], 422);
+        }
+
+        // Sort by: lowest games_played first, then FIFO (joined_at)
+        $waiting = QueueEntry::where('queue_session_id', $session->id)
+            ->where('status', 'waiting')
+            ->with('user:id,name')
+            ->orderBy('games_played', 'asc')
+            ->orderBy('joined_at', 'asc')
+            ->get();
+
+        if ($waiting->count() < 4) {
+            return response()->json(['suggested' => []]);
+        }
+
+        $list = $waiting->values()->all();
+
+        // Helper: get bracket from numeric level
+        $getBracket = function ($level) {
+            $l = (float) $level;
+            if ($l <= 2.5) return 'beginner';
+            if ($l <= 4.5) return 'intermediate';
+            return 'advanced';
+        };
+
+        // Helper: check if 4 players can form balanced doubles teams
+        $isBalancedDoubles = function ($players) use ($getBracket) {
+            $brackets = array_map(fn ($p) => $getBracket($p->level), $players);
+            $levels = array_map(fn ($p) => (float) $p->level, $players);
+
+            // All same bracket = always balanced
+            if (count(array_unique($brackets)) === 1) {
+                return true;
+            }
+
+            // Mixed brackets: check if we can form balanced teams
+            // Try pairing: Team A = [0,1], Team B = [2,3] and check if averages are close
+            $avgA1 = ($levels[0] + $levels[1]) / 2;
+            $avgB1 = ($levels[2] + $levels[3]) / 2;
+            $diff1 = abs($avgA1 - $avgB1);
+
+            // Try pairing: Team A = [0,2], Team B = [1,3]
+            $avgA2 = ($levels[0] + $levels[2]) / 2;
+            $avgB2 = ($levels[1] + $levels[3]) / 2;
+            $diff2 = abs($avgA2 - $avgB2);
+
+            // Try pairing: Team A = [0,3], Team B = [1,2]
+            $avgA3 = ($levels[0] + $levels[3]) / 2;
+            $avgB3 = ($levels[1] + $levels[2]) / 2;
+            $diff3 = abs($avgA3 - $avgB3);
+
+            // Balanced if any pairing has average difference <= 0.5
+            $minDiff = min($diff1, $diff2, $diff3);
+            return $minDiff <= 0.5;
+        };
+
+        // Try all combinations of 4 players (prioritize earlier in queue)
+        // For performance, check consecutive groups first, then try all combinations
+        $best = null;
+
+        // First: try consecutive groups (FIFO with games_played priority)
+        for ($i = 0; $i <= count($list) - 4; $i++) {
+            $group = array_slice($list, $i, 4);
+            if ($isBalancedDoubles($group)) {
+                $best = $group;
+                break;
+            }
+        }
+
+        // If no consecutive match, try all combinations (still prioritizing lower games_played)
+        if ($best === null) {
+            $n = count($list);
+            for ($i = 0; $i < $n - 3; $i++) {
+                for ($j = $i + 1; $j < $n - 2; $j++) {
+                    for ($k = $j + 1; $k < $n - 1; $k++) {
+                        for ($l = $k + 1; $l < $n; $l++) {
+                            $group = [$list[$i], $list[$j], $list[$k], $list[$l]];
+                            if ($isBalancedDoubles($group)) {
+                                $best = $group;
+                                break 4; // break all loops
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($best === null) {
+            return response()->json(['suggested' => []]);
+        }
+
+        return response()->json([
+            'suggested' => array_map(fn ($e) => [
+                'queue_entry_id' => $e->id,
+                'level' => (float) $e->level,
+                'name' => $e->user_id ? ($e->user?->name ?? '') : (string) $e->guest_name,
+            ], $best),
+        ]);
     }
 
     public function entries(Request $request, QueueSession $session)

@@ -11,6 +11,7 @@ export default function QueueSessionView() {
   const [session, setSession] = useState(null);
   const [entries, setEntries] = useState([]);
   const [availableCourts, setAvailableCourts] = useState([]);
+  const [allCourts, setAllCourts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [addMode, setAddMode] = useState("guest"); // "guest" | "user"
@@ -18,20 +19,32 @@ export default function QueueSessionView() {
   const [userResults, setUserResults] = useState([]);
   const [userSearching, setUserSearching] = useState(false);
   const [form, setForm] = useState({ guest_name: "", level: "3.5", phone: "", notes: "", user_id: "", levelOverride: "" });
+  const [selectedCourtId, setSelectedCourtId] = useState(null);
+  const [suggested, setSuggested] = useState([]);
+  const [suggestLoading, setSuggestLoading] = useState({});
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showEndMatchModal, setShowEndMatchModal] = useState(false);
+  const [endingMatchId, setEndingMatchId] = useState(null);
+  const [shuttlecocksUsed, setShuttlecocksUsed] = useState("");
+  const [manualTeamA, setManualTeamA] = useState([]);
+  const [manualTeamB, setManualTeamB] = useState([]);
 
   const load = useCallback(async () => {
     if (!sessionId) return;
     try {
       setLoading(true);
       setError("");
-      const [sRes, eRes, cRes] = await Promise.all([
+      const [sRes, eRes, cRes, allCourtsRes] = await Promise.all([
         api.get(`/queue/sessions/${sessionId}`),
         api.get(`/queue/sessions/${sessionId}/entries`),
         api.get(`/queue/sessions/${sessionId}/available-courts`),
+        api.get(`/queue/sessions/${sessionId}/courts`),
       ]);
       setSession(sRes.data);
       setEntries(eRes.data);
       setAvailableCourts(cRes.data);
+      setAllCourts(allCourtsRes.data || []);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load session");
     } finally {
@@ -126,6 +139,130 @@ export default function QueueSessionView() {
     }
   }
 
+  async function handleCourtClick(courtId) {
+    if (!courtId) return;
+    const court = allCourts.find((c) => Number(c.id) === Number(courtId));
+    if (court?.status !== "available") return; // Only allow clicking available courts
+
+    setError("");
+    setSelectedCourtId(courtId);
+    setSuggested([]);
+    setManualTeamA([]);
+    setManualTeamB([]);
+    setShowModal(true);
+  }
+
+  async function handleSuggestMatch() {
+    if (!selectedCourtId) return;
+    setError("");
+    setSuggestLoading((prev) => ({ ...prev, [selectedCourtId]: true }));
+    setSuggested([]);
+    setManualTeamA([]);
+    setManualTeamB([]);
+
+    try {
+      const res = await api.post(`/queue/sessions/${sessionId}/suggest-match`, { court_id: Number(selectedCourtId) });
+      const suggestedPlayers = Array.isArray(res.data?.suggested) ? res.data.suggested : [];
+      setSuggested(suggestedPlayers);
+      // Auto-populate teams: first 2 = Team A, last 2 = Team B
+      if (suggestedPlayers.length === 4) {
+        setManualTeamA(suggestedPlayers.slice(0, 2).map(s => s.queue_entry_id));
+        setManualTeamB(suggestedPlayers.slice(2, 4).map(s => s.queue_entry_id));
+      }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to suggest match");
+    } finally {
+      setSuggestLoading((prev) => ({ ...prev, [selectedCourtId]: false }));
+    }
+  }
+
+  async function handleAssignMatch() {
+    if (!selectedCourtId) return;
+    
+    // Check if we have manual selection or suggested match
+    const teamAIds = manualTeamA;
+    const teamBIds = manualTeamB;
+    
+    if (teamAIds.length !== 2 || teamBIds.length !== 2) {
+      setError("Please select exactly 2 players for Team A and 2 players for Team B");
+      return;
+    }
+
+    setError("");
+    setAssignLoading(true);
+    try {
+      await api.post("/queue/matches", {
+        queue_session_id: Number(sessionId),
+        court_id: Number(selectedCourtId),
+        teamA: teamAIds,
+        teamB: teamBIds,
+      });
+      setSuggested([]);
+      setManualTeamA([]);
+      setManualTeamB([]);
+      setSelectedCourtId(null);
+      setShowModal(false);
+      load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to assign match");
+    } finally {
+      setAssignLoading(false);
+    }
+  }
+
+  function togglePlayerInTeam(entryId, team) {
+    if (team === 'A') {
+      setManualTeamA(prev => {
+        if (prev.includes(entryId)) {
+          return prev.filter(id => id !== entryId);
+        } else if (prev.length < 2) {
+          return [...prev, entryId];
+        }
+        return prev;
+      });
+    } else {
+      setManualTeamB(prev => {
+        if (prev.includes(entryId)) {
+          return prev.filter(id => id !== entryId);
+        } else if (prev.length < 2) {
+          return [...prev, entryId];
+        }
+        return prev;
+      });
+    }
+  }
+
+  function handleCloseModal() {
+    setShowModal(false);
+    setSelectedCourtId(null);
+    setSuggested([]);
+    setManualTeamA([]);
+    setManualTeamB([]);
+  }
+
+  function handleEndMatchClick(matchId) {
+    setEndingMatchId(matchId);
+    setShuttlecocksUsed("");
+    setShowEndMatchModal(true);
+  }
+
+  async function handleEndMatch() {
+    if (!endingMatchId) return;
+    setError("");
+    try {
+      await api.patch(`/queue/matches/${endingMatchId}`, {
+        status: "completed",
+        shuttlecocks_used: shuttlecocksUsed ? Number(shuttlecocksUsed) : null,
+      });
+      setShowEndMatchModal(false);
+      setEndingMatchId(null);
+      setShuttlecocksUsed("");
+      load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to end match");
+    }
+  }
+
   function pickUser(u) {
     setForm((f) => ({ ...f, user_id: u.id, levelOverride: u.level != null ? String(u.level) : "" }));
     setUserQuery(u.name);
@@ -134,6 +271,23 @@ export default function QueueSessionView() {
 
   function displayName(entry) {
     return entry.user_id ? (entry.user?.name || "") : (entry.guest_name || "");
+  }
+
+  function matchPlayerNames(match) {
+    // If teams are available, show Team A vs Team B format
+    if (match.teamA && match.teamB) {
+      return `Team A: ${match.teamA.join(" & ")} vs Team B: ${match.teamB.join(" & ")}`;
+    }
+    
+    // Fallback to flat list
+    const list = match.queue_match_players || match.queueMatchPlayers || [];
+    return list
+      .map((qmp) => {
+        const e = qmp.queue_entry || qmp.queueEntry;
+        return e ? (e.user?.name || e.guest_name || "") : "";
+      })
+      .filter(Boolean)
+      .join(", ");
   }
 
   if (loading && !session) {
@@ -195,6 +349,465 @@ export default function QueueSessionView() {
           </button>
         )}
       </div>
+
+      {/* Courts Grid - Visual Court Selection */}
+      {session.status === "active" && allCourts.length > 0 && (
+        <div style={{ marginBottom: "1.5rem", padding: "1.5rem", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.75rem" }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>Courts</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1.5rem" }}>
+            {allCourts.map((court) => {
+              const isAvailable = court.status === "available";
+              const isLoading = suggestLoading[court.id];
+              const isInUse = court.status === "in-use";
+              const courtMatch = court.match;
+
+              return (
+                <div
+                  key={court.id}
+                  onClick={() => isAvailable && !isLoading && handleCourtClick(court.id)}
+                  style={{
+                    position: "relative",
+                    padding: "2rem 1.5rem",
+                    backgroundColor: isInUse ? "#fee2e2" : isAvailable ? "#d1fae5" : "#f3f4f6",
+                    border: `2px solid ${isInUse ? "#f87171" : isAvailable ? "#10b981" : "#9ca3af"}`,
+                    borderRadius: "0.75rem",
+                    cursor: isAvailable && !isLoading ? "pointer" : "not-allowed",
+                    opacity: isLoading ? 0.7 : 1,
+                    transition: "all 0.2s",
+                    textAlign: "center",
+                    minHeight: "180px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isAvailable && !isLoading) {
+                      e.currentTarget.style.transform = "scale(1.05)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  {isLoading && (
+                    <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: "1.5rem" }}>
+                      ⏳
+                    </div>
+                  )}
+                  <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>
+                    {isInUse ? "🏸" : "🏟️"}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: "1.25rem", color: "#111827", marginBottom: "0.5rem" }}>
+                    {court.name}
+                  </div>
+                  <div style={{ fontSize: "0.875rem", color: isInUse ? "#b91c1c" : isAvailable ? "#059669" : "#6b7280", fontWeight: 500, marginBottom: "0.5rem" }}>
+                    {isInUse ? "In Use" : isAvailable ? "Available" : "Unavailable"}
+                  </div>
+                  {isInUse && courtMatch && (
+                    <>
+                      <div style={{ marginTop: "0.75rem", fontSize: "0.8rem", color: "#374151", lineHeight: "1.5", width: "100%" }}>
+                        {courtMatch.teamA && courtMatch.teamB ? (
+                          <>
+                            <div style={{ marginBottom: "0.5rem" }}>
+                              <span style={{ fontWeight: 600, color: "#059669" }}>Team A:</span> {courtMatch.teamA.join(" & ")}
+                            </div>
+                            <div style={{ marginBottom: "0.5rem", fontSize: "0.7rem", color: "#6b7280" }}>vs</div>
+                            <div style={{ marginBottom: "0.5rem" }}>
+                              <span style={{ fontWeight: 600, color: "#dc2626" }}>Team B:</span> {courtMatch.teamB.join(" & ")}
+                            </div>
+                          </>
+                        ) : (
+                          // Fallback to flat list if teams not available
+                          courtMatch.players?.map((name, idx) => (
+                            <div key={idx} style={{ marginBottom: "0.25rem" }}>
+                              {name}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEndMatchClick(courtMatch.id);
+                        }}
+                        style={{
+                          marginTop: "0.75rem",
+                          padding: "0.5rem 1rem",
+                          fontSize: "0.875rem",
+                          backgroundColor: "#059669",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "0.375rem",
+                          cursor: "pointer",
+                          fontWeight: 500,
+                        }}
+                      >
+                        End Match
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Suggested Match */}
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+          onClick={handleCloseModal}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "2rem",
+              borderRadius: "0.75rem",
+              maxWidth: "500px",
+              width: "90%",
+              maxHeight: "90vh",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827" }}>
+                Assign match to {allCourts.find((c) => Number(c.id) === Number(selectedCourtId))?.name || "Court"}
+              </h3>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
+              >
+                ×
+              </button>
+            </div>
+
+            {suggestLoading[selectedCourtId] ? (
+              <div style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>Finding match...</div>
+            ) : (
+              <>
+                {/* Suggest Match Button */}
+                <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={handleSuggestMatch}
+                    disabled={suggestLoading[selectedCourtId]}
+                    style={{
+                      padding: "0.75rem 1.5rem",
+                      backgroundColor: "#3b82f6",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      fontWeight: 600,
+                      cursor: suggestLoading[selectedCourtId] ? "not-allowed" : "pointer",
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    {suggestLoading[selectedCourtId] ? "Finding Match..." : "Suggest Match"}
+                  </button>
+                </div>
+
+                {/* Suggested Match Display */}
+                {suggested.length === 4 && (
+                  <div style={{ marginBottom: "1.5rem", padding: "1rem", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "0.5rem" }}>
+                    <div style={{ fontSize: "0.875rem", color: "#1e40af", marginBottom: "0.5rem", fontWeight: 600 }}>Suggested Match:</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      {suggested.map((s, idx) => (
+                        <div key={s.queue_entry_id} style={{ fontSize: "0.875rem", color: "#1e3a8a" }}>
+                          {idx < 2 ? "Team A: " : "Team B: "}{s.name} (Level {s.level})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual Team Selection */}
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.75rem", fontWeight: 600 }}>
+                    Or manually select players (only waiting players available):
+                  </div>
+                  
+                  {/* Team A */}
+                  <div style={{ marginBottom: "1rem" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#059669", marginBottom: "0.5rem" }}>
+                      Team A ({manualTeamA.length}/2)
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minHeight: "80px", padding: "0.75rem", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "0.5rem" }}>
+                      {manualTeamA.map(entryId => {
+                        const entry = entries.find(e => e.id === entryId);
+                        if (!entry) return null;
+                        return (
+                          <div
+                            key={entryId}
+                            style={{
+                              padding: "0.5rem",
+                              backgroundColor: "#fff",
+                              border: "1px solid #86efac",
+                              borderRadius: "0.375rem",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontWeight: 500, color: "#111827" }}>{displayName(entry)}</span>
+                              <span style={{ color: "#6b7280", marginLeft: "0.5rem" }}>Level {entry.level}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => togglePlayerInTeam(entryId, 'A')}
+                              style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", backgroundColor: "#fee2e2", color: "#b91c1c", border: "none", borderRadius: "0.25rem", cursor: "pointer" }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {manualTeamA.length === 0 && (
+                        <div style={{ color: "#6b7280", fontSize: "0.875rem", fontStyle: "italic" }}>No players selected</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Team B */}
+                  <div style={{ marginBottom: "1rem" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#dc2626", marginBottom: "0.5rem" }}>
+                      Team B ({manualTeamB.length}/2)
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minHeight: "80px", padding: "0.75rem", backgroundColor: "#fef2f2", border: "1px solid #fecaca", borderRadius: "0.5rem" }}>
+                      {manualTeamB.map(entryId => {
+                        const entry = entries.find(e => e.id === entryId);
+                        if (!entry) return null;
+                        return (
+                          <div
+                            key={entryId}
+                            style={{
+                              padding: "0.5rem",
+                              backgroundColor: "#fff",
+                              border: "1px solid #fca5a5",
+                              borderRadius: "0.375rem",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontWeight: 500, color: "#111827" }}>{displayName(entry)}</span>
+                              <span style={{ color: "#6b7280", marginLeft: "0.5rem" }}>Level {entry.level}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => togglePlayerInTeam(entryId, 'B')}
+                              style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", backgroundColor: "#fee2e2", color: "#b91c1c", border: "none", borderRadius: "0.25rem", cursor: "pointer" }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {manualTeamB.length === 0 && (
+                        <div style={{ color: "#6b7280", fontSize: "0.875rem", fontStyle: "italic" }}>No players selected</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Available Players List */}
+                  <div style={{ marginBottom: "1.5rem" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>
+                      Available Players (waiting only):
+                    </div>
+                    <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      {entries.filter(e => e.status === "waiting").map((entry) => {
+                        const isInTeamA = manualTeamA.includes(entry.id);
+                        const isInTeamB = manualTeamB.includes(entry.id);
+                        const isSelected = isInTeamA || isInTeamB;
+                        const canAddToA = !isSelected && manualTeamA.length < 2;
+                        const canAddToB = !isSelected && manualTeamB.length < 2;
+
+                        return (
+                          <div
+                            key={entry.id}
+                            style={{
+                              padding: "0.75rem",
+                              backgroundColor: isSelected ? "#f3f4f6" : "#fff",
+                              border: `1px solid ${isSelected ? "#d1d5db" : "#e5e7eb"}`,
+                              borderRadius: "0.5rem",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              opacity: isSelected ? 0.6 : 1,
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontWeight: 500, color: "#111827" }}>{displayName(entry)}</span>
+                              <span style={{ color: "#6b7280", marginLeft: "0.5rem" }}>Level {entry.level}</span>
+                              {isInTeamA && <span style={{ color: "#059669", marginLeft: "0.5rem", fontWeight: 600 }}>(Team A)</span>}
+                              {isInTeamB && <span style={{ color: "#dc2626", marginLeft: "0.5rem", fontWeight: 600 }}>(Team B)</span>}
+                            </div>
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                              {canAddToA && (
+                                <button
+                                  type="button"
+                                  onClick={() => togglePlayerInTeam(entry.id, 'A')}
+                                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.8rem", backgroundColor: "#d1fae5", color: "#059669", border: "none", borderRadius: "0.375rem", cursor: "pointer", fontWeight: 500 }}
+                                >
+                                  Add to A
+                                </button>
+                              )}
+                              {canAddToB && (
+                                <button
+                                  type="button"
+                                  onClick={() => togglePlayerInTeam(entry.id, 'B')}
+                                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.8rem", backgroundColor: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "0.375rem", cursor: "pointer", fontWeight: 500 }}
+                                >
+                                  Add to B
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {entries.filter(e => e.status === "waiting").length === 0 && (
+                        <div style={{ padding: "1rem", textAlign: "center", color: "#6b7280", fontSize: "0.875rem" }}>
+                          No waiting players available
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    style={{ padding: "0.5rem 1rem", backgroundColor: "#f3f4f6", color: "#374151", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAssignMatch}
+                    disabled={assignLoading || manualTeamA.length !== 2 || manualTeamB.length !== 2}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      backgroundColor: manualTeamA.length === 2 && manualTeamB.length === 2 ? "#059669" : "#9ca3af",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      fontWeight: 500,
+                      cursor: assignLoading || (manualTeamA.length !== 2 || manualTeamB.length !== 2) ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {assignLoading ? "Assigning…" : "Assign Match"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Ending Match */}
+      {showEndMatchModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => {
+            setShowEndMatchModal(false);
+            setEndingMatchId(null);
+            setShuttlecocksUsed("");
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "2rem",
+              borderRadius: "0.75rem",
+              maxWidth: "400px",
+              width: "90%",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827" }}>End Match</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEndMatchModal(false);
+                  setEndingMatchId(null);
+                  setShuttlecocksUsed("");
+                }}
+                style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                Shuttlecocks Used (optional)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={shuttlecocksUsed}
+                onChange={(e) => setShuttlecocksUsed(e.target.value)}
+                placeholder="Enter number"
+                style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.375rem" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEndMatchModal(false);
+                  setEndingMatchId(null);
+                  setShuttlecocksUsed("");
+                }}
+                style={{ padding: "0.5rem 1rem", backgroundColor: "#f3f4f6", color: "#374151", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEndMatch}
+                style={{ padding: "0.5rem 1rem", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "0.375rem", fontWeight: 500, cursor: "pointer" }}
+              >
+                End Match
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add player */}
       <div style={{ marginBottom: "1.5rem", padding: "1.5rem", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.75rem" }}>
@@ -371,12 +984,6 @@ export default function QueueSessionView() {
         )}
       </div>
 
-      {/* Available courts (info) */}
-      {availableCourts.length > 0 && (
-        <div style={{ marginTop: "1.5rem", color: "#6b7280", fontSize: "0.9rem" }}>
-          Available courts: {availableCourts.map((c) => c.name).join(", ")}
-        </div>
-      )}
     </QueueMasterLayout>
   );
 }
