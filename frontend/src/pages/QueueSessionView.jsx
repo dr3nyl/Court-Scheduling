@@ -1,9 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import api from "../services/api";
 import QueueMasterLayout from "../components/QueueMasterLayout";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  flexRender,
+} from "@tanstack/react-table";
 
 export default function QueueSessionView() {
   const { sessionId } = useParams();
@@ -29,6 +37,9 @@ export default function QueueSessionView() {
   const [shuttlecocksUsed, setShuttlecocksUsed] = useState("");
   const [manualTeamA, setManualTeamA] = useState([]);
   const [manualTeamB, setManualTeamB] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sorting, setSorting] = useState([]);
 
   const load = useCallback(async () => {
     if (!sessionId) return;
@@ -273,6 +284,174 @@ export default function QueueSessionView() {
     return entry.user_id ? (entry.user?.name || "") : (entry.guest_name || "");
   }
 
+  // Define columns for TanStack Table
+  const columns = useMemo(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        accessorFn: (row) => displayName(row),
+        cell: ({ row }) => {
+          const entry = row.original;
+          return (
+            <div>
+              <span style={{ fontWeight: 600, color: "#111827" }}>{displayName(entry)}</span>
+              {entry.user_id && (
+                <span style={{ color: "#6b7280", fontSize: "0.75rem", marginLeft: "0.5rem" }}>(User)</span>
+              )}
+              {!entry.user_id && (
+                <span style={{ color: "#6b7280", fontSize: "0.75rem", marginLeft: "0.5rem" }}>(Guest)</span>
+              )}
+            </div>
+          );
+        },
+        enableSorting: true,
+      },
+      {
+        accessorKey: "level",
+        header: "Level",
+        cell: ({ getValue }) => (
+          <span style={{ color: "#374151" }}>{getValue()}</span>
+        ),
+        enableSorting: true,
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ getValue }) => {
+          const status = getValue();
+          return (
+            <span
+              style={{
+                padding: "0.25rem 0.5rem",
+                borderRadius: "0.25rem",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                backgroundColor:
+                  status === "waiting" ? "#dbeafe" :
+                  status === "playing" ? "#fef3c7" :
+                  status === "left" ? "#fee2e2" :
+                  "#e5e7eb",
+                color:
+                  status === "waiting" ? "#1e40af" :
+                  status === "playing" ? "#92400e" :
+                  status === "left" ? "#b91c1c" :
+                  "#374151",
+              }}
+            >
+              {status}
+            </span>
+          );
+        },
+        enableSorting: true,
+        filterFn: (row, id, value) => {
+          if (value === "all") return true;
+          return row.getValue(id) === value;
+        },
+      },
+      {
+        accessorKey: "games_played",
+        header: "Games Played",
+        cell: ({ getValue }) => {
+          const games = getValue();
+          return games != null && games > 0 ? (
+            <span style={{ color: "#059669", fontWeight: 500 }}>{games}</span>
+          ) : (
+            <span style={{ color: "#9ca3af" }}>0</span>
+          );
+        },
+        enableSorting: true,
+      },
+      {
+        accessorKey: "phone",
+        header: "Phone",
+        cell: ({ getValue }) => (
+          <span style={{ color: "#6b7280" }}>{getValue() || "-"}</span>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const entry = row.original;
+          return (
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+              {!["left", "done"].includes(entry.status) ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleExit(entry.id)}
+                    style={{
+                      padding: "0.35rem 0.65rem",
+                      fontSize: "0.8rem",
+                      backgroundColor: "#fef3c7",
+                      color: "#92400e",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Exit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(entry.id)}
+                    style={{
+                      padding: "0.35rem 0.65rem",
+                      fontSize: "0.8rem",
+                      backgroundColor: "#fee2e2",
+                      color: "#b91c1c",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>-</span>
+              )}
+            </div>
+          );
+        },
+        enableSorting: false,
+      },
+    ],
+    []
+  );
+
+  // Filter and prepare data
+  const filteredData = useMemo(() => {
+    return entries.filter((entry) => {
+      const matchesSearch = searchQuery === "" || 
+        displayName(entry).toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || entry.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [entries, searchQuery, statusFilter]);
+
+  // Setup TanStack Table
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
+
   function matchPlayerNames(match) {
     // If teams are available, show Team A vs Team B format
     if (match.teamA && match.teamB) {
@@ -319,6 +498,7 @@ export default function QueueSessionView() {
         <div style={{ color: "#6b7280", fontSize: "0.95rem" }}>
           {session.owner?.name && `Owner: ${session.owner.name} · `} Status: <strong>{session.status}</strong>
           {availableCourts.length > 0 && ` · ${availableCourts.length} court(s) free`}
+          {session.completed_matches_count != null && session.completed_matches_count > 0 && ` · ${session.completed_matches_count} game(s) played`}
         </div>
       </div>
 
@@ -932,55 +1112,223 @@ export default function QueueSessionView() {
       </div>
 
       {/* Queue / entries */}
-      <div>
-        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>Queue ({entries.length})</h3>
-        {entries.length === 0 ? (
-          <p style={{ color: "#6b7280", padding: "1.5rem", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.75rem" }}>No players yet. Add a guest or user above.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {entries.map((entry) => (
-              <div
-                key={entry.id}
+      <div style={{ padding: "1.5rem", backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.75rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#111827", margin: 0 }}>
+            Queue ({entries.length})
+          </h3>
+          
+          {/* Search and Filter Controls */}
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            {/* Search Input */}
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name..."
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "1rem 1.25rem",
-                  backgroundColor: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "0.5rem",
+                  padding: "0.5rem 0.75rem",
+                  paddingLeft: "2.5rem",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.875rem",
+                  width: "200px",
                 }}
-              >
-                <div>
-                  <span style={{ fontWeight: 600, color: "#111827" }}>{displayName(entry)}</span>
-                  <span style={{ color: "#6b7280", marginLeft: "0.5rem" }}>· {entry.level} · {entry.status}</span>
-                  {entry.games_played != null && entry.games_played > 0 && (
-                    <span style={{ color: "#059669", marginLeft: "0.5rem" }}>· {entry.games_played} games</span>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  {!["left", "done"].includes(entry.status) && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleExit(entry.id)}
-                        style={{ padding: "0.35rem 0.65rem", fontSize: "0.8rem", backgroundColor: "#fef3c7", color: "#92400e", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
-                      >
-                        Exit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(entry.id)}
-                        style={{ padding: "0.35rem 0.65rem", fontSize: "0.8rem", backgroundColor: "#fee2e2", color: "#b91c1c", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
-                      >
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              />
+              <span style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "#6b7280" }}>🔍</span>
+            </div>
+            
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                padding: "0.5rem 0.75rem",
+                border: "1px solid #d1d5db",
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem",
+                backgroundColor: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              <option value="all">All Status</option>
+              <option value="waiting">Waiting</option>
+              <option value="playing">Playing</option>
+              <option value="left">Left</option>
+              <option value="done">Done</option>
+            </select>
           </div>
+        </div>
+
+        {entries.length === 0 ? (
+          <p style={{ color: "#6b7280", padding: "1.5rem", textAlign: "center" }}>No players yet. Add a guest or user above.</p>
+        ) : filteredData.length === 0 ? (
+          <p style={{ color: "#6b7280", padding: "1.5rem", textAlign: "center" }}>
+            No players match your search criteria.
+          </p>
+        ) : (
+          <>
+            {/* Results Count */}
+            <div style={{ marginBottom: "0.75rem", fontSize: "0.875rem", color: "#6b7280" }}>
+              Showing {table.getRowModel().rows.length} of {filteredData.length} players
+              {filteredData.length !== entries.length && ` (${entries.length} total)`}
+            </div>
+            
+            {/* Table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id} style={{ backgroundColor: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                      {headerGroup.headers.map((header) => (
+                        <th
+                          key={header.id}
+                          style={{
+                            padding: "0.75rem",
+                            textAlign: header.id === "actions" ? "right" : "left",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                            color: "#374151",
+                            cursor: header.column.getCanSort() ? "pointer" : "default",
+                            userSelect: "none",
+                          }}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getCanSort() && (
+                              <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                                {{
+                                  asc: " ↑",
+                                  desc: " ↓",
+                                }[header.column.getIsSorted()] ?? " ⇅"}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      style={{
+                        borderBottom: "1px solid #e5e7eb",
+                        backgroundColor: index % 2 === 0 ? "#fff" : "#f9fafb",
+                      }}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          style={{
+                            padding: "0.75rem",
+                            fontSize: "0.875rem",
+                            textAlign: cell.column.id === "actions" ? "right" : "left",
+                          }}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", flexWrap: "wrap", gap: "1rem" }}>
+              <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: table.getCanPreviousPage() ? "#f3f4f6" : "#f9fafb",
+                    color: table.getCanPreviousPage() ? "#374151" : "#9ca3af",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    cursor: table.getCanPreviousPage() ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {"<<"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: table.getCanPreviousPage() ? "#f3f4f6" : "#f9fafb",
+                    color: table.getCanPreviousPage() ? "#374151" : "#9ca3af",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    cursor: table.getCanPreviousPage() ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {"<"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: table.getCanNextPage() ? "#f3f4f6" : "#f9fafb",
+                    color: table.getCanNextPage() ? "#374151" : "#9ca3af",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    cursor: table.getCanNextPage() ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {">"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: table.getCanNextPage() ? "#f3f4f6" : "#f9fafb",
+                    color: table.getCanNextPage() ? "#374151" : "#9ca3af",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    cursor: table.getCanNextPage() ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {">>"}
+                </button>
+                <select
+                  value={table.getState().pagination.pageSize}
+                  onChange={(e) => table.setPageSize(Number(e.target.value))}
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.875rem",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    backgroundColor: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  {[10, 20, 30, 50].map((pageSize) => (
+                    <option key={pageSize} value={pageSize}>
+                      Show {pageSize}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

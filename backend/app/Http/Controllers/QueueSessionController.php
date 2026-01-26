@@ -63,6 +63,11 @@ class QueueSessionController extends Controller
             ]),
         ]);
 
+        // Add count of completed matches
+        $session->completed_matches_count = $session->matches()
+            ->where('status', 'completed')
+            ->count();
+
         return $session;
     }
 
