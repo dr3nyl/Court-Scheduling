@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\QueueEntry;
+use App\Services\QueueEntryService;
 use Illuminate\Http\Request;
 
 class QueueEntryController extends Controller
 {
+    public function __construct(
+        private QueueEntryService $queueEntryService
+    ) {
+    }
+
     public function update(Request $request, QueueEntry $entry)
     {
         $session = $entry->queueSession;
-        $user = $request->user();
-        $allowed = $session->owner_id === $user->id || $user->role === 'queue_master';
-        abort_if(! $allowed, 403);
+        $this->authorize('update', $session);
 
         $request->validate([
             'status' => 'sometimes|in:waiting,matched,playing,done,left',
@@ -21,17 +25,16 @@ class QueueEntryController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $entry->update($request->only(['status', 'level', 'phone', 'notes']));
-
-        return $entry->load('user:id,name');
+        return $this->queueEntryService->updateEntry(
+            $entry,
+            $request->only(['status', 'level', 'phone', 'notes'])
+        );
     }
 
     public function destroy(Request $request, QueueEntry $entry)
     {
         $session = $entry->queueSession;
-        $user = $request->user();
-        $allowed = $session->owner_id === $user->id || $user->role === 'queue_master';
-        abort_if(! $allowed, 403);
+        $this->authorize('update', $session);
 
         $entry->delete();
 

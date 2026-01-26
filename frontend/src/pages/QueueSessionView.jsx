@@ -46,18 +46,52 @@ export default function QueueSessionView() {
     try {
       setLoading(true);
       setError("");
-      const [sRes, eRes, cRes, allCourtsRes] = await Promise.all([
+      
+      // Use Promise.allSettled to handle partial failures gracefully
+      const [sRes, eRes, cRes, allCourtsRes] = await Promise.allSettled([
         api.get(`/queue/sessions/${sessionId}`),
         api.get(`/queue/sessions/${sessionId}/entries`),
         api.get(`/queue/sessions/${sessionId}/available-courts`),
         api.get(`/queue/sessions/${sessionId}/courts`),
       ]);
-      setSession(sRes.data);
-      setEntries(eRes.data);
-      setAvailableCourts(cRes.data);
-      setAllCourts(allCourtsRes.data || []);
+
+      // Check if the main session request failed
+      if (sRes.status === 'rejected') {
+        const error = sRes.reason;
+        console.error('Failed to load session:', error);
+        
+        let errorMessage = "Failed to load session";
+        if (error?.response?.status === 404) {
+          errorMessage = "Session not found. It may have been deleted or the ID is incorrect.";
+        } else if (error?.response?.status === 403) {
+          errorMessage = "You don't have permission to view this session.";
+        } else if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        setError(errorMessage);
+        setSession(null);
+      } else {
+        // Session loaded successfully
+        setSession(sRes.value.data);
+        
+        // Handle other requests (they might fail but we still want to show the session)
+        if (eRes.status === 'fulfilled') {
+          setEntries(eRes.value.data);
+        }
+        if (cRes.status === 'fulfilled') {
+          setAvailableCourts(cRes.value.data);
+        }
+        if (allCourtsRes.status === 'fulfilled') {
+          setAllCourts(allCourtsRes.value.data || []);
+        }
+      }
     } catch (e) {
-      setError(e?.response?.data?.message || "Failed to load session");
+      console.error('Unexpected error loading session:', e);
+      setError(e?.response?.data?.message || e?.message || "Failed to load session");
+      setSession(null);
     } finally {
       setLoading(false);
     }
@@ -480,7 +514,9 @@ export default function QueueSessionView() {
   if (!session) {
     return (
       <QueueMasterLayout>
-        <div style={{ color: "#b91c1c" }}>Session not found.</div>
+        <div style={{ color: "#b91c1c" }}>
+          {error || "Session not found."}
+        </div>
         <Link to="/queue-master" style={{ color: "#059669", marginTop: "0.5rem", display: "inline-block" }}>← Back to sessions</Link>
       </QueueMasterLayout>
     );
