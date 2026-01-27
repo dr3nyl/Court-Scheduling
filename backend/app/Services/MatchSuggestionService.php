@@ -34,30 +34,72 @@ class MatchSuggestionService
 
         $list = $waiting->values()->all();
 
-        // Try all combinations of 4 players (prioritize earlier in queue)
-        // For performance, check consecutive groups first, then try all combinations
-        $best = null;
+        // Strategy: 
+        // 1. First try to find 4 players with similar levels (all close together)
+        // 2. If not possible, find mixed teams (1 high + 1 low per team)
+        // 3. Collect all valid matches and randomly select one (shuffle mode)
+        
+        $validMatches = [
+            'similar' => [], // Similar-level groups (priority)
+            'mixed' => [],   // Mixed teams
+        ];
 
         // First: try consecutive groups (FIFO with games_played priority)
         for ($i = 0; $i <= count($list) - 4; $i++) {
             $group = array_slice($list, $i, 4);
-            if ($this->isBalancedDoubles($group)) {
-                $best = $group;
-                break;
+            $pairing = $this->findOptimalPairing($group);
+            
+            // Only accept if reasonably balanced (diff <= 1.0)
+            if ($pairing['diff'] > 1.0) {
+                continue;
+            }
+            
+            $isSimilarLevel = $this->areSimilarLevels($group);
+            
+            if ($isSimilarLevel) {
+                $validMatches['similar'][] = [
+                    'ordered' => $pairing['ordered'],
+                    'pairing' => $pairing,
+                    'group' => $group,
+                ];
+            } else {
+                $validMatches['mixed'][] = [
+                    'ordered' => $pairing['ordered'],
+                    'pairing' => $pairing,
+                    'group' => $group,
+                ];
             }
         }
 
-        // If no consecutive match, try all combinations (still prioritizing lower games_played)
-        if ($best === null) {
+        // If no good consecutive matches found, try all combinations
+        if (empty($validMatches['similar']) && empty($validMatches['mixed'])) {
             $n = count($list);
             for ($i = 0; $i < $n - 3; $i++) {
                 for ($j = $i + 1; $j < $n - 2; $j++) {
                     for ($k = $j + 1; $k < $n - 1; $k++) {
                         for ($l = $k + 1; $l < $n; $l++) {
                             $group = [$list[$i], $list[$j], $list[$k], $list[$l]];
-                            if ($this->isBalancedDoubles($group)) {
-                                $best = $group;
-                                break 4; // break all loops
+                            $pairing = $this->findOptimalPairing($group);
+                            
+                            // Only accept if reasonably balanced (diff <= 1.0)
+                            if ($pairing['diff'] > 1.0) {
+                                continue;
+                            }
+                            
+                            $isSimilarLevel = $this->areSimilarLevels($group);
+                            
+                            if ($isSimilarLevel) {
+                                $validMatches['similar'][] = [
+                                    'ordered' => $pairing['ordered'],
+                                    'pairing' => $pairing,
+                                    'group' => $group,
+                                ];
+                            } else {
+                                $validMatches['mixed'][] = [
+                                    'ordered' => $pairing['ordered'],
+                                    'pairing' => $pairing,
+                                    'group' => $group,
+                                ];
                             }
                         }
                     }
@@ -65,7 +107,66 @@ class MatchSuggestionService
             }
         }
 
-        if ($best === null) {
+        // Select randomly from valid matches (prioritize similar-level groups and lowest games_played)
+        $selected = null;
+        
+        // Helper function to calculate priority score (lower games_played = higher priority)
+        $calculatePriority = function ($match) {
+            $minGamesPlayed = min(array_map(fn ($p) => $p->games_played ?? 0, $match['group']));
+            $avgGamesPlayed = array_sum(array_map(fn ($p) => $p->games_played ?? 0, $match['group'])) / 4;
+            // Lower is better, so we use negative for sorting
+            return ['min' => $minGamesPlayed, 'avg' => $avgGamesPlayed];
+        };
+        
+        if (!empty($validMatches['similar'])) {
+            // Sort by lowest games_played (min first, then avg)
+            usort($validMatches['similar'], function ($a, $b) use ($calculatePriority) {
+                $priorityA = $calculatePriority($a);
+                $priorityB = $calculatePriority($b);
+                if ($priorityA['min'] !== $priorityB['min']) {
+                    return $priorityA['min'] <=> $priorityB['min'];
+                }
+                return $priorityA['avg'] <=> $priorityB['avg'];
+            });
+            
+            // Get top matches with same lowest games_played, then randomly select from them
+            $topMatches = [];
+            $lowestGamesPlayed = $calculatePriority($validMatches['similar'][0])['min'];
+            foreach ($validMatches['similar'] as $match) {
+                $priority = $calculatePriority($match);
+                if ($priority['min'] === $lowestGamesPlayed) {
+                    $topMatches[] = $match;
+                } else {
+                    break;
+                }
+            }
+            $selected = $topMatches[array_rand($topMatches)];
+        } elseif (!empty($validMatches['mixed'])) {
+            // Sort by lowest games_played (min first, then avg)
+            usort($validMatches['mixed'], function ($a, $b) use ($calculatePriority) {
+                $priorityA = $calculatePriority($a);
+                $priorityB = $calculatePriority($b);
+                if ($priorityA['min'] !== $priorityB['min']) {
+                    return $priorityA['min'] <=> $priorityB['min'];
+                }
+                return $priorityA['avg'] <=> $priorityB['avg'];
+            });
+            
+            // Get top matches with same lowest games_played, then randomly select from them
+            $topMatches = [];
+            $lowestGamesPlayed = $calculatePriority($validMatches['mixed'][0])['min'];
+            foreach ($validMatches['mixed'] as $match) {
+                $priority = $calculatePriority($match);
+                if ($priority['min'] === $lowestGamesPlayed) {
+                    $topMatches[] = $match;
+                } else {
+                    break;
+                }
+            }
+            $selected = $topMatches[array_rand($topMatches)];
+        }
+
+        if ($selected === null) {
             return ['suggested' => []];
         }
 
@@ -74,7 +175,7 @@ class MatchSuggestionService
                 'queue_entry_id' => $e->id,
                 'level' => (float) $e->level,
                 'name' => $e->user_id ? ($e->user?->name ?? '') : (string) $e->guest_name,
-            ], $best),
+            ], $selected['ordered']),
         ];
     }
 
@@ -107,36 +208,108 @@ class MatchSuggestionService
     }
 
     /**
+     * Check if 4 players have similar levels (max spread <= 1.5).
+     */
+    private function areSimilarLevels(array $players): bool
+    {
+        $levels = array_map(fn ($p) => (float) $p->level, $players);
+        $minLevel = min($levels);
+        $maxLevel = max($levels);
+        return ($maxLevel - $minLevel) <= 1.5;
+    }
+
+    /**
+     * Check if 4 players can form balanced doubles teams and return optimal pairing.
+     * Returns array with 'balanced' (bool) and 'ordered' (array of players in optimal team order).
+     * 
+     * Strategy:
+     * - If all players have similar levels: pair similar players together (2 highest vs 2 lowest)
+     * - If mixed levels: pair 1 high + 1 low per team for balance
+     */
+    private function findOptimalPairing(array $players): array
+    {
+        $levels = array_map(fn ($p) => (float) $p->level, $players);
+        $isSimilarLevel = $this->areSimilarLevels($players);
+
+        // If all players have similar levels, pair similar players together
+        if ($isSimilarLevel) {
+            // Sort players by level
+            $sorted = $players;
+            usort($sorted, fn ($a, $b) => (float) $a->level <=> (float) $b->level);
+            
+            // Pair: 2 highest together vs 2 lowest together
+            $teamA = [$sorted[2], $sorted[3]]; // 2 highest
+            $teamB = [$sorted[0], $sorted[1]]; // 2 lowest
+            
+            $avgA = ((float) $sorted[2]->level + (float) $sorted[3]->level) / 2;
+            $avgB = ((float) $sorted[0]->level + (float) $sorted[1]->level) / 2;
+            $diff = abs($avgA - $avgB);
+            
+            return [
+                'balanced' => $diff <= 0.5,
+                'ordered' => array_merge($teamA, $teamB),
+                'teamA' => $teamA,
+                'teamB' => $teamB,
+                'diff' => $diff,
+            ];
+        }
+
+        // Mixed levels: pair 1 high + 1 low per team for balance
+        // Try all possible pairings and find the best one
+        $pairings = [
+            // Pairing 1: Team A = [0,1], Team B = [2,3]
+            [
+                'teamA' => [$players[0], $players[1]],
+                'teamB' => [$players[2], $players[3]],
+                'avgA' => ($levels[0] + $levels[1]) / 2,
+                'avgB' => ($levels[2] + $levels[3]) / 2,
+            ],
+            // Pairing 2: Team A = [0,2], Team B = [1,3] (mixed: high+low per team)
+            [
+                'teamA' => [$players[0], $players[2]],
+                'teamB' => [$players[1], $players[3]],
+                'avgA' => ($levels[0] + $levels[2]) / 2,
+                'avgB' => ($levels[1] + $levels[3]) / 2,
+            ],
+            // Pairing 3: Team A = [0,3], Team B = [1,2] (mixed: high+low per team)
+            [
+                'teamA' => [$players[0], $players[3]],
+                'teamB' => [$players[1], $players[2]],
+                'avgA' => ($levels[0] + $levels[3]) / 2,
+                'avgB' => ($levels[1] + $levels[2]) / 2,
+            ],
+        ];
+
+        // Calculate difference for each pairing
+        foreach ($pairings as &$pairing) {
+            $pairing['diff'] = abs($pairing['avgA'] - $pairing['avgB']);
+        }
+        unset($pairing);
+
+        // Find the pairing with the smallest difference
+        $bestPairing = $pairings[0];
+        foreach ($pairings as $pairing) {
+            if ($pairing['diff'] < $bestPairing['diff']) {
+                $bestPairing = $pairing;
+            }
+        }
+
+        // Return players in optimal order: Team A first, then Team B
+        return [
+            'balanced' => $bestPairing['diff'] <= 0.5,
+            'ordered' => array_merge($bestPairing['teamA'], $bestPairing['teamB']),
+            'teamA' => $bestPairing['teamA'],
+            'teamB' => $bestPairing['teamB'],
+            'diff' => $bestPairing['diff'],
+        ];
+    }
+
+    /**
      * Check if 4 players can form balanced doubles teams.
      */
     private function isBalancedDoubles(array $players): bool
     {
-        $brackets = array_map(fn ($p) => $this->getBracket((float) $p->level), $players);
-        $levels = array_map(fn ($p) => (float) $p->level, $players);
-
-        // All same bracket = always balanced
-        if (count(array_unique($brackets)) === 1) {
-            return true;
-        }
-
-        // Mixed brackets: check if we can form balanced teams
-        // Try pairing: Team A = [0,1], Team B = [2,3] and check if averages are close
-        $avgA1 = ($levels[0] + $levels[1]) / 2;
-        $avgB1 = ($levels[2] + $levels[3]) / 2;
-        $diff1 = abs($avgA1 - $avgB1);
-
-        // Try pairing: Team A = [0,2], Team B = [1,3]
-        $avgA2 = ($levels[0] + $levels[2]) / 2;
-        $avgB2 = ($levels[1] + $levels[3]) / 2;
-        $diff2 = abs($avgA2 - $avgB2);
-
-        // Try pairing: Team A = [0,3], Team B = [1,2]
-        $avgA3 = ($levels[0] + $levels[3]) / 2;
-        $avgB3 = ($levels[1] + $levels[2]) / 2;
-        $diff3 = abs($avgA3 - $avgB3);
-
-        // Balanced if any pairing has average difference <= 0.5
-        $minDiff = min($diff1, $diff2, $diff3);
-        return $minDiff <= 0.5;
+        $result = $this->findOptimalPairing($players);
+        return $result['balanced'];
     }
 }
