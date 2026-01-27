@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'owner' => \App\Http\Middleware\EnsureOwner::class,
             'queue_master_or_owner' => \App\Http\Middleware\EnsureQueueMasterOrOwner::class,
         ]);
+        
+        // Configure CORS for API routes
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
