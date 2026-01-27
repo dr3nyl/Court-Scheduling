@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import OwnerLayout from "../components/OwnerLayout";
 
@@ -19,11 +19,7 @@ export default function OwnerCourtSchedule() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    loadData();
-  }, [courtId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [schedulesRes, courtsRes] = await Promise.all([
@@ -39,7 +35,11 @@ export default function OwnerCourtSchedule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courtId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const addSchedule = async () => {
     if (!dayOfWeek || !openTime || !closeTime) {
@@ -140,11 +140,6 @@ export default function OwnerCourtSchedule() {
 
   const dayName = (day) => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    return days[day];
-  };
-
-  const dayShortName = (day) => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return days[day];
   };
 

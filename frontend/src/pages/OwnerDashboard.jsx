@@ -49,15 +49,6 @@ export default function OwnerDashboard() {
     return timeString.slice(0, 5);
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   return (
     <OwnerLayout>
       {/* Page Header */}

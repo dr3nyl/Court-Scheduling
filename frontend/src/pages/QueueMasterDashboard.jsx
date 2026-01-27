@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
@@ -16,11 +16,7 @@ export default function QueueMasterDashboard() {
 
   const isOwner = user?.role === "owner";
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -35,7 +31,11 @@ export default function QueueMasterDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [isOwner]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   function today() {
     return new Date().toISOString().slice(0, 10);

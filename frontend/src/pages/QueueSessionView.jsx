@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
 import api from "../services/api";
 import QueueMasterLayout from "../components/QueueMasterLayout";
 import {
@@ -15,7 +13,6 @@ import {
 
 export default function QueueSessionView() {
   const { sessionId } = useParams();
-  const { user } = useContext(AuthContext);
   const [session, setSession] = useState(null);
   const [entries, setEntries] = useState([]);
   const [availableCourts, setAvailableCourts] = useState([]);
@@ -165,16 +162,16 @@ export default function QueueSessionView() {
     }
   }
 
-  async function handleExit(entryId) {
+  const handleExit = useCallback(async (entryId) => {
     try {
       await api.patch(`/queue/entries/${entryId}`, { status: "left" });
       load();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to update");
     }
-  }
+  }, [load]);
 
-  async function handleRemove(entryId) {
+  const handleRemove = useCallback(async (entryId) => {
     if (!window.confirm("Remove from queue?")) return;
     try {
       await api.delete(`/queue/entries/${entryId}`);
@@ -182,7 +179,7 @@ export default function QueueSessionView() {
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to remove");
     }
-  }
+  }, [load]);
 
   async function handleCourtClick(courtId) {
     if (!courtId) return;
@@ -454,7 +451,7 @@ export default function QueueSessionView() {
         enableSorting: false,
       },
     ],
-    []
+    [handleExit, handleRemove]
   );
 
   // Filter and prepare data
@@ -485,23 +482,6 @@ export default function QueueSessionView() {
       },
     },
   });
-
-  function matchPlayerNames(match) {
-    // If teams are available, show Team A vs Team B format
-    if (match.teamA && match.teamB) {
-      return `Team A: ${match.teamA.join(" & ")} vs Team B: ${match.teamB.join(" & ")}`;
-    }
-    
-    // Fallback to flat list
-    const list = match.queue_match_players || match.queueMatchPlayers || [];
-    return list
-      .map((qmp) => {
-        const e = qmp.queue_entry || qmp.queueEntry;
-        return e ? (e.user?.name || e.guest_name || "") : "";
-      })
-      .filter(Boolean)
-      .join(", ");
-  }
 
   if (loading && !session) {
     return (

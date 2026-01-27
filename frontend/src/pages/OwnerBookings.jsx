@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import OwnerLayout from "../components/OwnerLayout";
 
@@ -10,11 +10,7 @@ export default function OwnerBookings() {
   const [error, setError] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
 
-  useEffect(() => {
-    loadBookings();
-  }, [filter, dateFilter]);
-
-  const loadBookings = async () => {
+  const loadBookings = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -45,7 +41,11 @@ export default function OwnerBookings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, dateFilter]);
+
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
 
   const handleCancel = async (bookingId) => {
     if (!window.confirm("Are you sure you want to cancel this booking?")) {
