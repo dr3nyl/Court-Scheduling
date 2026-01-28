@@ -220,7 +220,7 @@ export default function Login() {
         </form>
 
         {/* Sign up link */}
-        <div style={{ textAlign: "center" }}>
+        {/* <div style={{ textAlign: "center" }}>
           <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>
             Don't have an account?{" "}
             <Link
@@ -234,7 +234,7 @@ export default function Login() {
               Sign up
             </Link>
           </p>
-        </div>
+        </div> */}
 
         {/* Back to home */}
         <div style={{ textAlign: "center", marginTop: "1rem" }}>

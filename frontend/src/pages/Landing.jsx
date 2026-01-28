@@ -51,7 +51,7 @@ export default function Landing() {
             >
               Login
             </Link>
-            <Link
+            {/* <Link
               to="/register"
               style={{
                 padding: "0.5rem 1rem",
@@ -64,7 +64,7 @@ export default function Landing() {
               }}
             >
               Sign Up
-            </Link>
+            </Link> */}
           </nav>
         </div>
       </header>
@@ -117,7 +117,7 @@ export default function Landing() {
               flexWrap: "wrap",
             }}
           >
-            <Link
+            {/* <Link
               to="/register"
               style={{
                 padding: "0.875rem 2rem",
@@ -141,7 +141,7 @@ export default function Landing() {
               }}
             >
               Get Started
-            </Link>
+            </Link> */}
             <Link
               to="/login"
               style={{
