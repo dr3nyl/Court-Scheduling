@@ -35,6 +35,14 @@ export default function PlayerBooking() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [confirmDialog, setConfirmDialog] = useState(null); // { courtId, slot, courtName }
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Load available courts/slots whenever date changes
   useEffect(() => {
@@ -116,11 +124,11 @@ export default function PlayerBooking() {
   return (
     <PlayerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           Book a Court
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           Choose a date and time slot to book your court
         </p>
       </div>
@@ -139,6 +147,7 @@ export default function PlayerBooking() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
+            padding: isMobile ? "0.5rem" : undefined,
           }}
           onClick={() => setConfirmDialog(null)}
         >
@@ -146,14 +155,14 @@ export default function PlayerBooking() {
             style={{
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
-              padding: "2rem",
+              padding: isMobile ? "1rem" : "2rem",
               maxWidth: "400px",
               width: "90%",
               boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
+            <h3 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
               Confirm Booking
             </h3>
             <div style={{ marginBottom: "1.5rem", color: "#374151" }}>
@@ -172,7 +181,7 @@ export default function PlayerBooking() {
                 <strong>Time:</strong> {confirmDialog.slot.start} - {confirmDialog.slot.end}
               </p>
             </div>
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
               <button
                 onClick={() => setConfirmDialog(null)}
                 style={{
@@ -183,6 +192,7 @@ export default function PlayerBooking() {
                   borderRadius: "0.5rem",
                   cursor: "pointer",
                   fontWeight: 500,
+                  flex: isMobile ? 1 : "none",
                 }}
               >
                 Cancel
@@ -199,6 +209,7 @@ export default function PlayerBooking() {
                   cursor: bookingLoading ? "not-allowed" : "pointer",
                   fontWeight: 500,
                   opacity: bookingLoading ? 0.6 : 1,
+                  flex: isMobile ? 1 : "none",
                 }}
               >
                 {bookingLoading ? "Booking..." : "Confirm"}
@@ -214,7 +225,7 @@ export default function PlayerBooking() {
           backgroundColor: "#ffffff",
           borderRadius: "0.75rem",
           border: "1px solid #e5e7eb",
-          padding: "1.5rem",
+          padding: isMobile ? "1rem" : "1.5rem",
           marginBottom: "1.5rem",
         }}
       >
@@ -236,7 +247,7 @@ export default function PlayerBooking() {
             padding: "0.5rem 0.75rem",
             borderRadius: "0.375rem",
             border: "1px solid #d1d5db",
-            maxWidth: "220px",
+            maxWidth: isMobile ? "100%" : "220px",
             marginBottom: "1rem",
             fontSize: "0.95rem",
           }}
@@ -247,7 +258,10 @@ export default function PlayerBooking() {
           style={{
             display: "flex",
             gap: "0.5rem",
-            flexWrap: "wrap",
+            flexWrap: "nowrap",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            paddingBottom: "0.25rem",
           }}
         >
           {days.map((d) => {
@@ -262,7 +276,7 @@ export default function PlayerBooking() {
                   setSuccess("");
                 }}
                 style={{
-                  padding: "0.4rem 0.75rem",
+                  padding: isMobile ? "0.5rem 0.75rem" : "0.4rem 0.75rem",
                   borderRadius: "999px",
                   border: isSelected ? "1px solid #2563eb" : "1px solid #e5e7eb",
                   backgroundColor: isSelected ? "#2563eb" : "#ffffff",
@@ -270,6 +284,8 @@ export default function PlayerBooking() {
                   fontSize: "0.85rem",
                   cursor: "pointer",
                   transition: "background-color 0.15s, color 0.15s, border 0.15s",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }}
               >
                 {d.label}
@@ -359,6 +375,7 @@ export default function PlayerBooking() {
               fontSize: "0.95rem",
               backgroundColor: "#ffffff",
               cursor: "pointer",
+              width: isMobile ? "100%" : undefined,
             }}
           >
             <option value="all">All Courts</option>
@@ -392,7 +409,7 @@ export default function PlayerBooking() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "1.5rem",
           }}
         >
@@ -428,12 +445,12 @@ export default function PlayerBooking() {
                   style={{
                     borderRadius: "0.75rem",
                     border: "1px solid #e5e7eb",
-                    padding: "1.5rem",
+                    padding: isMobile ? "1rem" : "1.5rem",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                     backgroundColor: "#ffffff",
                   }}
                 >
-                  <h3 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.5rem", color: "#111827" }}>
+                  <h3 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, marginBottom: "0.5rem", color: "#111827" }}>
                     {court.name}
                   </h3>
                   <p
@@ -473,11 +490,12 @@ export default function PlayerBooking() {
                                   border: "1px solid #16a34a",
                                   backgroundColor: "#dcfce7",
                                   color: "#166534",
-                                  fontSize: "0.85rem",
+                                  fontSize: isMobile ? "0.85rem" : "0.85rem",
                                   fontWeight: 500,
                                   cursor: bookingLoading ? "not-allowed" : "pointer",
                                   opacity: bookingLoading ? 0.6 : 1,
                                   transition: "all 0.2s",
+                                  width: isMobile ? "100%" : undefined,
                                 }}
                                 onMouseEnter={(e) => {
                                   if (!bookingLoading) {

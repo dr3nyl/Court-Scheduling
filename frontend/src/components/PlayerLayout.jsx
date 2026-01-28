@@ -1,10 +1,24 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 
 export default function PlayerLayout({ children }) {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileMenuOpen(false);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -20,33 +34,88 @@ export default function PlayerLayout({ children }) {
           borderBottom: "1px solid #e5e7eb",
           padding: "1rem 0",
           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
         }}
       >
         <div
           style={{
             maxWidth: "1200px",
             margin: "0 auto",
-            padding: "0 1.5rem",
+            padding: "0 1rem",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
           {/* Logo/Brand */}
           <Link
             to="/player"
             style={{
-              fontSize: "1.5rem",
+              fontSize: isMobile ? "1.25rem" : "1.5rem",
               fontWeight: "bold",
               color: "#2563eb",
               textDecoration: "none",
+              flexShrink: 0,
             }}
           >
             CourtScheduler
           </Link>
 
-          {/* Navigation Links */}
-          <nav style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            style={{
+              display: isMobile ? "flex" : "none",
+              flexDirection: "column",
+              gap: "4px",
+              padding: "0.5rem",
+              backgroundColor: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+            aria-label="Toggle menu"
+          >
+            <span
+              style={{
+                width: "24px",
+                height: "2px",
+                backgroundColor: "#374151",
+                transition: "all 0.3s",
+                transform: mobileMenuOpen ? "rotate(45deg) translate(5px, 5px)" : "none",
+              }}
+            />
+            <span
+              style={{
+                width: "24px",
+                height: "2px",
+                backgroundColor: "#374151",
+                transition: "all 0.3s",
+                opacity: mobileMenuOpen ? 0 : 1,
+              }}
+            />
+            <span
+              style={{
+                width: "24px",
+                height: "2px",
+                backgroundColor: "#374151",
+                transition: "all 0.3s",
+                transform: mobileMenuOpen ? "rotate(-45deg) translate(7px, -6px)" : "none",
+              }}
+            />
+          </button>
+
+          {/* Desktop Navigation Links */}
+          <nav
+            style={{
+              display: isMobile ? "none" : "flex",
+              gap: "1.5rem",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <Link
               to="/player"
               style={{
@@ -54,6 +123,7 @@ export default function PlayerLayout({ children }) {
                 textDecoration: "none",
                 fontWeight: 500,
                 fontSize: "0.95rem",
+                whiteSpace: "nowrap",
               }}
             >
               Dashboard
@@ -65,6 +135,7 @@ export default function PlayerLayout({ children }) {
                 textDecoration: "none",
                 fontWeight: 500,
                 fontSize: "0.95rem",
+                whiteSpace: "nowrap",
               }}
             >
               Book a Court
@@ -76,6 +147,7 @@ export default function PlayerLayout({ children }) {
                 textDecoration: "none",
                 fontWeight: 500,
                 fontSize: "0.95rem",
+                whiteSpace: "nowrap",
               }}
             >
               My Bookings
@@ -90,9 +162,10 @@ export default function PlayerLayout({ children }) {
                 marginLeft: "1rem",
                 paddingLeft: "1rem",
                 borderLeft: "1px solid #e5e7eb",
+                flexWrap: "wrap",
               }}
             >
-              <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+              <span style={{ color: "#6b7280", fontSize: "0.9rem", whiteSpace: "nowrap" }}>
                 Hello, {user?.name}
               </span>
               <button
@@ -106,12 +179,109 @@ export default function PlayerLayout({ children }) {
                   cursor: "pointer",
                   fontSize: "0.85rem",
                   fontWeight: 500,
+                  whiteSpace: "nowrap",
                 }}
               >
                 Logout
               </button>
             </div>
           </nav>
+
+          {/* Mobile Navigation Menu */}
+          {isMobile && mobileMenuOpen && (
+            <nav
+              style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                paddingTop: "1rem",
+                borderTop: "1px solid #e5e7eb",
+                marginTop: "1rem",
+              }}
+            >
+              <Link
+                to="/player"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: "#374151",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.375rem",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/player/book"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: "#374151",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.375rem",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                Book a Court
+              </Link>
+              <Link
+                to="/player/bookings"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: "#374151",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.375rem",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                My Bookings
+              </Link>
+
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderTop: "1px solid #e5e7eb",
+                  marginTop: "0.5rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
+                }}
+              >
+                <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>Hello, {user?.name}</span>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    backgroundColor: "#ef4444",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "0.375rem",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    fontWeight: 500,
+                    width: "100%",
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            </nav>
+          )}
         </div>
       </header>
 
@@ -120,7 +290,7 @@ export default function PlayerLayout({ children }) {
         style={{
           maxWidth: "1200px",
           margin: "0 auto",
-          padding: "2rem 1.5rem",
+          padding: isMobile ? "1rem" : "2rem 1.5rem",
         }}
       >
         {children}

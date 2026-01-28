@@ -11,9 +11,17 @@ export default function PlayerBookings() {
   const [cancellingId, setCancellingId] = useState(null);
   const [expandedDates, setExpandedDates] = useState(new Set());
   const [dateSearch, setDateSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     loadBookings();
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Auto-expand today and upcoming dates on load
@@ -226,11 +234,11 @@ export default function PlayerBookings() {
   return (
     <PlayerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           My Bookings
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           View and manage all your court bookings
         </p>
       </div>
@@ -243,6 +251,10 @@ export default function PlayerBookings() {
           marginBottom: "1.5rem",
           borderBottom: "2px solid #e5e7eb",
           flexWrap: "wrap",
+          overflowX: isMobile ? "auto" : "visible",
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
         }}
       >
         {[
@@ -255,16 +267,18 @@ export default function PlayerBookings() {
             key={tab.key}
             onClick={() => setFilter(tab.key)}
             style={{
-              padding: "0.75rem 1.5rem",
+              padding: isMobile ? "0.5rem 1rem" : "0.75rem 1.5rem",
               backgroundColor: "transparent",
               border: "none",
               borderBottom: filter === tab.key ? "2px solid #2563eb" : "2px solid transparent",
               color: filter === tab.key ? "#2563eb" : "#6b7280",
               fontWeight: filter === tab.key ? 600 : 500,
               cursor: "pointer",
-              fontSize: "0.95rem",
+              fontSize: isMobile ? "0.85rem" : "0.95rem",
               marginBottom: "-2px",
               position: "relative",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {tab.label}
@@ -298,21 +312,22 @@ export default function PlayerBookings() {
         <button
           onClick={jumpToToday}
           style={{
-            padding: "0.5rem 1rem",
+            padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 1rem",
             backgroundColor: "#2563eb",
             color: "#ffffff",
             border: "none",
             borderRadius: "0.5rem",
             cursor: "pointer",
             fontWeight: 500,
-            fontSize: "0.9rem",
+            fontSize: isMobile ? "0.85rem" : "0.9rem",
             display: "flex",
             alignItems: "center",
             gap: "0.5rem",
+            whiteSpace: "nowrap",
           }}
         >
           <span>📅</span>
-          Jump to Today
+          {!isMobile && "Jump to Today"}
         </button>
         <input
           type="text"
@@ -321,24 +336,25 @@ export default function PlayerBookings() {
           onChange={(e) => setDateSearch(e.target.value)}
           style={{
             flex: 1,
-            minWidth: "200px",
+            minWidth: isMobile ? "140px" : "200px",
             padding: "0.5rem 1rem",
             borderRadius: "0.5rem",
             border: "1px solid #d1d5db",
-            fontSize: "0.9rem",
+            fontSize: isMobile ? "0.85rem" : "0.9rem",
           }}
         />
         {dateSearch && (
           <button
             onClick={() => setDateSearch("")}
             style={{
-              padding: "0.5rem 1rem",
+              padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 1rem",
               backgroundColor: "#f3f4f6",
               color: "#374151",
               border: "none",
               borderRadius: "0.5rem",
               cursor: "pointer",
-              fontSize: "0.9rem",
+              fontSize: isMobile ? "0.85rem" : "0.9rem",
+              whiteSpace: "nowrap",
             }}
           >
             Clear
@@ -445,7 +461,7 @@ export default function PlayerBookings() {
                   onClick={() => toggleDate(date)}
                   style={{
                     width: "100%",
-                    padding: "1.25rem 1.5rem",
+                    padding: isMobile ? "1rem" : "1.25rem 1.5rem",
                     backgroundColor: "transparent",
                     border: "none",
                     cursor: "pointer",
@@ -455,10 +471,10 @@ export default function PlayerBookings() {
                     textAlign: "left",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "0.5rem" : "1rem", flex: 1, flexWrap: "wrap" }}>
                     <div
                       style={{
-                        fontSize: "1.5rem",
+                        fontSize: isMobile ? "1.1rem" : "1.5rem",
                         fontWeight: 600,
                         color: "#111827",
                       }}
@@ -485,8 +501,9 @@ export default function PlayerBookings() {
                         backgroundColor: isDateUpcoming ? "#dcfce7" : "#f3f4f6",
                         color: isDateUpcoming ? "#166534" : "#6b7280",
                         borderRadius: "999px",
-                        fontSize: "0.85rem",
+                        fontSize: isMobile ? "0.8rem" : "0.85rem",
                         fontWeight: 600,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {dateBookings.length} {dateBookings.length === 1 ? "booking" : "bookings"}
@@ -508,7 +525,7 @@ export default function PlayerBookings() {
                 {isExpanded && (
                   <div
                     style={{
-                      padding: "0 1.5rem 1.5rem 1.5rem",
+                      padding: isMobile ? "0 1rem 1rem 1rem" : "0 1.5rem 1.5rem 1.5rem",
                       borderTop: "1px solid #e5e7eb",
                       marginTop: "0.5rem",
                       paddingTop: "1rem",
@@ -529,7 +546,7 @@ export default function PlayerBookings() {
                           <div
                             key={booking.id}
                             style={{
-                              padding: "1rem",
+                              padding: isMobile ? "0.75rem" : "1rem",
                               backgroundColor: "#f9fafb",
                               borderRadius: "0.5rem",
                               border: "1px solid #e5e7eb",
