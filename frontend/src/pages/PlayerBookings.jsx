@@ -136,6 +136,33 @@ export default function PlayerBookings() {
     return grouped;
   };
 
+  const groupBookingsByCourt = (bookingsList) => {
+    const grouped = {};
+    bookingsList.forEach((booking) => {
+      const courtId = booking.court?.id || "unknown";
+      const courtName = booking.court?.name || "Court";
+      if (!grouped[courtId]) {
+        grouped[courtId] = {
+          courtId,
+          courtName,
+          bookings: [],
+        };
+      }
+      grouped[courtId].bookings.push(booking);
+    });
+    // Convert to array and sort by court name, then by first booking time
+    return Object.values(grouped)
+      .map((group) => ({
+        ...group,
+        bookings: group.bookings.sort((a, b) => a.start_time.localeCompare(b.start_time)),
+      }))
+      .sort((a, b) => {
+        const nameCompare = a.courtName.localeCompare(b.courtName);
+        if (nameCompare !== 0) return nameCompare;
+        return a.bookings[0].start_time.localeCompare(b.bookings[0].start_time);
+      });
+  };
+
   const filteredBookings = useMemo(() => {
     return bookings.filter((booking) => {
       if (filter === "upcoming") return isUpcoming(booking);
@@ -191,6 +218,7 @@ export default function PlayerBookings() {
         // Sort bookings by time
         return a.start_time.localeCompare(b.start_time);
       }),
+      courts: groupBookingsByCourt(grouped[dateStr]),
     }));
   }, [filteredBookings, filter, dateSearch]);
 
@@ -429,7 +457,7 @@ export default function PlayerBookings() {
             gap: "1rem",
           }}
         >
-          {groupedBookings.map(({ date, bookings: dateBookings }) => {
+          {groupedBookings.map(({ date, bookings: dateBookings, courts }) => {
             const isExpanded = expandedDates.has(date);
             const isDateUpcoming = dateBookings.some(isUpcoming);
             const isDateToday = isToday(date);
@@ -535,16 +563,18 @@ export default function PlayerBookings() {
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "0.75rem",
+                        gap: "1rem",
                       }}
                     >
-                      {dateBookings.map((booking) => {
-                        const isUpcomingBooking = isUpcoming(booking);
-                        const isCancelled = booking.status === "cancelled";
+                      {courts?.map((courtGroup) => {
+                        const courtBookings = courtGroup.bookings;
+                        const hasUpcoming = courtBookings.some(isUpcoming);
+                        const hasCancelled = courtBookings.some((b) => b.status === "cancelled");
+                        const allCancelled = courtBookings.every((b) => b.status === "cancelled");
 
                         return (
                           <div
-                            key={booking.id}
+                            key={courtGroup.courtId}
                             style={{
                               padding: isMobile ? "0.75rem" : "1rem",
                               backgroundColor: "#f9fafb",
@@ -552,94 +582,220 @@ export default function PlayerBookings() {
                               border: "1px solid #e5e7eb",
                             }}
                           >
+                            {/* Court Header */}
                             <div
                               style={{
                                 display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
+                                alignItems: "center",
+                                gap: "0.75rem",
+                                marginBottom: "0.75rem",
                                 flexWrap: "wrap",
-                                gap: "1rem",
                               }}
                             >
-                              <div style={{ flex: 1 }}>
-                                <div
+                              <h3
+                                style={{
+                                  fontSize: "1.1rem",
+                                  fontWeight: 600,
+                                  color: "#111827",
+                                  margin: 0,
+                                }}
+                              >
+                                {courtGroup.courtName}
+                              </h3>
+                              {hasCancelled && !allCancelled && (
+                                <span
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.75rem",
-                                    marginBottom: "0.5rem",
-                                    flexWrap: "wrap",
-                                  }}
-                                >
-                                  <h3
-                                    style={{
-                                      fontSize: "1.1rem",
-                                      fontWeight: 600,
-                                      color: "#111827",
-                                      margin: 0,
-                                    }}
-                                  >
-                                    {booking.court?.name || "Court"}
-                                  </h3>
-                                  <span
-                                    style={{
-                                      padding: "0.25rem 0.75rem",
-                                      backgroundColor: isCancelled
-                                        ? "#fee2e2"
-                                        : isUpcomingBooking
-                                        ? "#dcfce7"
-                                        : "#f3f4f6",
-                                      color: isCancelled
-                                        ? "#991b1b"
-                                        : isUpcomingBooking
-                                        ? "#166534"
-                                        : "#374151",
-                                      borderRadius: "999px",
-                                      fontSize: "0.8rem",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {isCancelled
-                                      ? "Cancelled"
-                                      : isUpcomingBooking
-                                      ? "Confirmed"
-                                      : "Past"}
-                                  </span>
-                                </div>
-                                <div
-                                  style={{
-                                    color: "#6b7280",
-                                    fontSize: "0.9rem",
-                                    display: "flex",
-                                    gap: "1rem",
-                                    flexWrap: "wrap",
-                                  }}
-                                >
-                                  <span>
-                                    <strong>Time:</strong> {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-                                  </span>
-                                </div>
-                              </div>
-                              {isUpcomingBooking && !isCancelled && (
-                                <button
-                                  onClick={() => handleCancel(booking.id)}
-                                  disabled={cancellingId === booking.id}
-                                  style={{
-                                    padding: "0.5rem 1rem",
+                                    padding: "0.25rem 0.75rem",
                                     backgroundColor: "#fee2e2",
                                     color: "#991b1b",
-                                    border: "1px solid #fecaca",
-                                    borderRadius: "0.5rem",
-                                    cursor: cancellingId === booking.id ? "not-allowed" : "pointer",
+                                    borderRadius: "999px",
+                                    fontSize: "0.8rem",
                                     fontWeight: 500,
-                                    fontSize: "0.85rem",
-                                    opacity: cancellingId === booking.id ? 0.6 : 1,
-                                    whiteSpace: "nowrap",
                                   }}
                                 >
-                                  {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-                                </button>
+                                  Some Cancelled
+                                </span>
                               )}
+                              {allCancelled && (
+                                <span
+                                  style={{
+                                    padding: "0.25rem 0.75rem",
+                                    backgroundColor: "#fee2e2",
+                                    color: "#991b1b",
+                                    borderRadius: "999px",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  All Cancelled
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Time Slots - Compact Display */}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.5rem",
+                              }}
+                            >
+                              {/* Group time slots by status for better display */}
+                              {(() => {
+                                const upcomingSlots = courtBookings.filter(
+                                  (b) => isUpcoming(b) && b.status !== "cancelled"
+                                );
+                                const cancelledSlots = courtBookings.filter((b) => b.status === "cancelled");
+                                const pastSlots = courtBookings.filter(
+                                  (b) => !isUpcoming(b) && b.status !== "cancelled"
+                                );
+
+                                return (
+                                  <>
+                                    {upcomingSlots.length > 0 && (
+                                      <div>
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexWrap: "wrap",
+                                            gap: "0.5rem",
+                                            alignItems: "center",
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: "0.85rem",
+                                              color: "#6b7280",
+                                              fontWeight: 500,
+                                              marginRight: "0.25rem",
+                                            }}
+                                          >
+                                            {isMobile ? "Times:" : "Reserved time slots:"}
+                                          </span>
+                                          {upcomingSlots.map((booking, idx) => (
+                                            <div
+                                              key={booking.id}
+                                              style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem",
+                                              }}
+                                            >
+                                              <span
+                                                style={{
+                                                  fontSize: "0.9rem",
+                                                  color: "#111827",
+                                                  fontWeight: 500,
+                                                }}
+                                              >
+                                                {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                                              </span>
+                                              {isUpcoming(booking) && booking.status !== "cancelled" && (
+                                                <button
+                                                  onClick={() => handleCancel(booking.id)}
+                                                  disabled={cancellingId === booking.id}
+                                                  style={{
+                                                    padding: "0.25rem 0.5rem",
+                                                    backgroundColor: "#fee2e2",
+                                                    color: "#991b1b",
+                                                    border: "1px solid #fecaca",
+                                                    borderRadius: "0.25rem",
+                                                    cursor: cancellingId === booking.id ? "not-allowed" : "pointer",
+                                                    fontWeight: 500,
+                                                    fontSize: "0.75rem",
+                                                    opacity: cancellingId === booking.id ? 0.6 : 1,
+                                                    whiteSpace: "nowrap",
+                                                  }}
+                                                  title="Cancel this booking"
+                                                >
+                                                  {cancellingId === booking.id ? "..." : "✕"}
+                                                </button>
+                                              )}
+                                              {idx < upcomingSlots.length - 1 && (
+                                                <span style={{ color: "#d1d5db" }}>•</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {cancelledSlots.length > 0 && (
+                                      <div>
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexWrap: "wrap",
+                                            gap: "0.5rem",
+                                            alignItems: "center",
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: "0.85rem",
+                                              color: "#9ca3af",
+                                              textDecoration: "line-through",
+                                              marginRight: "0.25rem",
+                                            }}
+                                          >
+                                            Cancelled:
+                                          </span>
+                                          {cancelledSlots.map((booking, idx) => (
+                                            <span
+                                              key={booking.id}
+                                              style={{
+                                                fontSize: "0.9rem",
+                                                color: "#9ca3af",
+                                                textDecoration: "line-through",
+                                              }}
+                                            >
+                                              {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                                              {idx < cancelledSlots.length - 1 && (
+                                                <span style={{ color: "#d1d5db", marginLeft: "0.5rem" }}>•</span>
+                                              )}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {pastSlots.length > 0 && (
+                                      <div>
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexWrap: "wrap",
+                                            gap: "0.5rem",
+                                            alignItems: "center",
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: "0.85rem",
+                                              color: "#9ca3af",
+                                              marginRight: "0.25rem",
+                                            }}
+                                          >
+                                            Past:
+                                          </span>
+                                          {pastSlots.map((booking, idx) => (
+                                            <span
+                                              key={booking.id}
+                                              style={{
+                                                fontSize: "0.9rem",
+                                                color: "#9ca3af",
+                                              }}
+                                            >
+                                              {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                                              {idx < pastSlots.length - 1 && (
+                                                <span style={{ color: "#d1d5db", marginLeft: "0.5rem" }}>•</span>
+                                              )}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
