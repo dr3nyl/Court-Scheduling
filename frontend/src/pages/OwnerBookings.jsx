@@ -264,7 +264,8 @@ export default function OwnerBookings() {
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dateStr = date.toISOString().slice(0, 10);
+      // Format date string manually to avoid timezone issues with toISOString()
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayBookings = getBookingsForDate(dateStr);
       days.push({
         date,

@@ -9,12 +9,18 @@ const todayString = () => new Date().toISOString().slice(0, 10);
 const buildNext7Days = () => {
   const days = [];
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
+    // Format date string manually to avoid timezone issues with toISOString()
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     days.push({
-      value: d.toISOString().slice(0, 10),
+      value: dateStr,
       label: d.toLocaleDateString(undefined, {
         weekday: "short",
         month: "short",
