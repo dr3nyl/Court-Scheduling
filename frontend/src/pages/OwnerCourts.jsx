@@ -6,9 +6,13 @@ import OwnerLayout from "../components/OwnerLayout";
 export default function OwnerCourts() {
   const [courts, setCourts] = useState([]);
   const [name, setName] = useState("");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [reservationFeePercentage, setReservationFeePercentage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editActive, setEditActive] = useState(true);
+  const [editHourlyRate, setEditHourlyRate] = useState("");
+  const [editReservationFeePercentage, setEditReservationFeePercentage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -49,9 +53,16 @@ export default function OwnerCourts() {
     try {
       setError("");
       setSuccess("");
-      const res = await api.post("/courts", { name: name.trim() });
+      const payload = {
+        name: name.trim(),
+        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        reservation_fee_percentage: reservationFeePercentage ? parseFloat(reservationFeePercentage) : 0,
+      };
+      const res = await api.post("/courts", payload);
       setCourts([...courts, res.data]);
       setName("");
+      setHourlyRate("");
+      setReservationFeePercentage("");
       setSuccess("Court created successfully!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
@@ -64,12 +75,16 @@ export default function OwnerCourts() {
     setEditingId(court.id);
     setEditName(court.name);
     setEditActive(court.is_active !== false);
+    setEditHourlyRate(court.hourly_rate || "");
+    setEditReservationFeePercentage(court.reservation_fee_percentage || "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
     setEditActive(true);
+    setEditHourlyRate("");
+    setEditReservationFeePercentage("");
   };
 
   const saveEdit = async (courtId) => {
@@ -84,6 +99,8 @@ export default function OwnerCourts() {
       const res = await api.patch(`/courts/${courtId}`, {
         name: editName.trim(),
         is_active: editActive,
+        hourly_rate: editHourlyRate ? parseFloat(editHourlyRate) : null,
+        reservation_fee_percentage: editReservationFeePercentage ? parseFloat(editReservationFeePercentage) : 0,
       });
       setCourts(courts.map((c) => (c.id === courtId ? res.data : c)));
       setEditingId(null);
@@ -120,55 +137,121 @@ export default function OwnerCourts() {
         <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
           Add New Court
         </h2>
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: 1, minWidth: isMobile ? "100%" : "200px" }}>
-            <label
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ flex: 1, minWidth: isMobile ? "100%" : "200px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: isMobile ? "0.8rem" : "0.875rem",
+                  fontWeight: 500,
+                  color: "#374151",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Court Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                }}
+                placeholder="e.g., Court 1, Badminton Court A"
+                onKeyPress={(e) => e.key === "Enter" && addCourt()}
+                style={{
+                  width: "100%",
+                  padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
+                  borderRadius: "0.375rem",
+                  border: "1px solid #d1d5db",
+                  fontSize: isMobile ? "0.9rem" : "0.95rem",
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: isMobile ? "100%" : "150px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: isMobile ? "0.8rem" : "0.875rem",
+                  fontWeight: 500,
+                  color: "#374151",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Hourly Rate (PHP)
+              </label>
+              <input
+                type="number"
+                value={hourlyRate}
+                onChange={(e) => {
+                  setHourlyRate(e.target.value);
+                  setError("");
+                }}
+                placeholder="e.g., 300"
+                min="0"
+                step="0.01"
+                style={{
+                  width: "100%",
+                  padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
+                  borderRadius: "0.375rem",
+                  border: "1px solid #d1d5db",
+                  fontSize: isMobile ? "0.9rem" : "0.95rem",
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: isMobile ? "100%" : "150px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: isMobile ? "0.8rem" : "0.875rem",
+                  fontWeight: 500,
+                  color: "#374151",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Reservation Fee (%)
+              </label>
+              <input
+                type="number"
+                value={reservationFeePercentage}
+                onChange={(e) => {
+                  setReservationFeePercentage(e.target.value);
+                  setError("");
+                }}
+                placeholder="e.g., 20"
+                min="0"
+                max="100"
+                step="0.01"
+                style={{
+                  width: "100%",
+                  padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
+                  borderRadius: "0.375rem",
+                  border: "1px solid #d1d5db",
+                  fontSize: isMobile ? "0.9rem" : "0.95rem",
+                }}
+              />
+            </div>
+            <button
+              onClick={addCourt}
+              disabled={loading}
               style={{
-                display: "block",
-                fontSize: isMobile ? "0.8rem" : "0.875rem",
+                padding: isMobile ? "0.5rem 1rem" : "0.5rem 1.5rem",
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "0.375rem",
+                cursor: loading ? "not-allowed" : "pointer",
                 fontWeight: 500,
-                color: "#374151",
-                marginBottom: "0.5rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
+                opacity: loading ? 0.6 : 1,
+                width: isMobile ? "100%" : "auto",
+                alignSelf: isMobile ? "stretch" : "flex-end",
               }}
             >
-              Court Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setError("");
-              }}
-              placeholder="e.g., Court 1, Badminton Court A"
-              onKeyPress={(e) => e.key === "Enter" && addCourt()}
-              style={{
-                width: "100%",
-                padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
-                borderRadius: "0.375rem",
-                border: "1px solid #d1d5db",
-                fontSize: isMobile ? "0.9rem" : "0.95rem",
-              }}
-            />
+              {loading ? "Adding..." : "Add Court"}
+            </button>
           </div>
-          <button
-            onClick={addCourt}
-            disabled={loading}
-            style={{
-              padding: isMobile ? "0.5rem 1rem" : "0.5rem 1.5rem",
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "0.375rem",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontWeight: 500,
-              fontSize: isMobile ? "0.9rem" : "0.95rem",
-              opacity: loading ? 0.6 : 1,
-              width: isMobile ? "100%" : "auto",
-            }}
-          >
-            {loading ? "Adding..." : "Add Court"}
-          </button>
         </div>
       </div>
 
@@ -281,47 +364,124 @@ export default function OwnerCourts() {
                     gap: "0.75rem",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
-                    <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <div style={{ flex: 1 }}>
+                        {editingId === court.id ? (
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Court Name"
+                            style={{
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              border: "1px solid #d1d5db",
+                              fontSize: "0.95rem",
+                              width: "100%",
+                              marginBottom: "0.5rem",
+                            }}
+                          />
+                        ) : (
+                          <span style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>{court.name}</span>
+                        )}
+                      </div>
                       {editingId === court.id ? (
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          style={{
-                            padding: "0.5rem 0.75rem",
-                            borderRadius: "0.375rem",
-                            border: "1px solid #d1d5db",
-                            fontSize: "0.95rem",
-                            width: "100%",
-                          }}
-                        />
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={editActive}
+                            onChange={(e) => setEditActive(e.target.checked)}
+                          />
+                          <span style={{ fontSize: "0.875rem", color: "#374151" }}>Active</span>
+                        </label>
                       ) : (
-                        <span style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>{court.name}</span>
+                        <span
+                          style={{
+                            padding: "0.25rem 0.75rem",
+                            backgroundColor: court.is_active !== false ? "#dcfce7" : "#fee2e2",
+                            color: court.is_active !== false ? "#166534" : "#991b1b",
+                            borderRadius: "999px",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {court.is_active !== false ? "Active" : "Inactive"}
+                        </span>
                       )}
                     </div>
-                    {editingId === court.id ? (
-                      <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-                        <input
-                          type="checkbox"
-                          checked={editActive}
-                          onChange={(e) => setEditActive(e.target.checked)}
-                        />
-                        <span style={{ fontSize: "0.875rem", color: "#374151" }}>Active</span>
-                      </label>
-                    ) : (
-                      <span
-                        style={{
-                          padding: "0.25rem 0.75rem",
-                          backgroundColor: court.is_active !== false ? "#dcfce7" : "#fee2e2",
-                          color: court.is_active !== false ? "#166534" : "#991b1b",
-                          borderRadius: "999px",
-                          fontSize: "0.85rem",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {court.is_active !== false ? "Active" : "Inactive"}
-                      </span>
+                    {editingId === court.id && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "0.8rem",
+                              fontWeight: 500,
+                              color: "#374151",
+                              marginBottom: "0.25rem",
+                            }}
+                          >
+                            Hourly Rate (PHP)
+                          </label>
+                          <input
+                            type="number"
+                            value={editHourlyRate}
+                            onChange={(e) => setEditHourlyRate(e.target.value)}
+                            placeholder="e.g., 300"
+                            min="0"
+                            step="0.01"
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              border: "1px solid #d1d5db",
+                              fontSize: "0.9rem",
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "0.8rem",
+                              fontWeight: 500,
+                              color: "#374151",
+                              marginBottom: "0.25rem",
+                            }}
+                          >
+                            Reservation Fee (%)
+                          </label>
+                          <input
+                            type="number"
+                            value={editReservationFeePercentage}
+                            onChange={(e) => setEditReservationFeePercentage(e.target.value)}
+                            placeholder="e.g., 20"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              border: "1px solid #d1d5db",
+                              fontSize: "0.9rem",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {!editingId && (
+                      <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                        {court.hourly_rate ? (
+                          <div>Rate: ₱{parseFloat(court.hourly_rate).toFixed(2)}/hour</div>
+                        ) : (
+                          <div style={{ color: "#9ca3af" }}>No rate set</div>
+                        )}
+                        {court.reservation_fee_percentage > 0 && (
+                          <div>Reservation Fee: {court.reservation_fee_percentage}%</div>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -424,6 +584,17 @@ export default function OwnerCourts() {
                       fontSize: "0.875rem",
                     }}
                   >
+                    Pricing
+                  </th>
+                  <th
+                    style={{
+                      padding: "1rem",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                    }}
+                  >
                     Status
                   </th>
                   <th
@@ -460,6 +631,7 @@ export default function OwnerCourts() {
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Court Name"
                           style={{
                             padding: "0.5rem 0.75rem",
                             borderRadius: "0.375rem",
@@ -467,10 +639,61 @@ export default function OwnerCourts() {
                             fontSize: "0.95rem",
                             width: "100%",
                             maxWidth: "300px",
+                            marginBottom: "0.5rem",
                           }}
                         />
                       ) : (
                         <span style={{ fontWeight: 500, color: "#111827" }}>{court.name}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "1rem" }}>
+                      {editingId === court.id ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "200px" }}>
+                          <input
+                            type="number"
+                            value={editHourlyRate}
+                            onChange={(e) => setEditHourlyRate(e.target.value)}
+                            placeholder="Hourly Rate (PHP)"
+                            min="0"
+                            step="0.01"
+                            style={{
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              border: "1px solid #d1d5db",
+                              fontSize: "0.9rem",
+                              width: "100%",
+                            }}
+                          />
+                          <input
+                            type="number"
+                            value={editReservationFeePercentage}
+                            onChange={(e) => setEditReservationFeePercentage(e.target.value)}
+                            placeholder="Reservation Fee (%)"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            style={{
+                              padding: "0.5rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              border: "1px solid #d1d5db",
+                              fontSize: "0.9rem",
+                              width: "100%",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                          {court.hourly_rate ? (
+                            <div>₱{parseFloat(court.hourly_rate).toFixed(2)}/hour</div>
+                          ) : (
+                            <div style={{ color: "#9ca3af" }}>No rate set</div>
+                          )}
+                          {court.reservation_fee_percentage > 0 && (
+                            <div style={{ fontSize: "0.8rem", marginTop: "0.25rem" }}>
+                              Fee: {court.reservation_fee_percentage}%
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td style={{ padding: "1rem" }}>

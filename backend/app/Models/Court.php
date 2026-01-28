@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Court extends Model
 {
-    protected $fillable = ['owner_id', 'name', 'is_active'];
+    protected $fillable = ['owner_id', 'name', 'is_active', 'hourly_rate', 'reservation_fee_percentage'];
 
     public function owner()
     {

@@ -21,12 +21,16 @@ class CourtController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:50'
+            'name' => 'required|string|max:50',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'reservation_fee_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         return Court::create([
             'owner_id' => $request->user()->id,
-            'name' => $request->name
+            'name' => $request->name,
+            'hourly_rate' => $request->hourly_rate,
+            'reservation_fee_percentage' => $request->reservation_fee_percentage ?? 0,
         ]);
     }
 
@@ -35,7 +39,13 @@ class CourtController extends Controller
         // ownership check
         abort_if($court->owner_id !== $request->user()->id, 403);
 
-        $court->update($request->only(['name', 'is_active']));
+        $request->validate([
+            'name' => 'sometimes|required|string|max:50',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'reservation_fee_percentage' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $court->update($request->only(['name', 'is_active', 'hourly_rate', 'reservation_fee_percentage']));
         return $court;
     }
 
@@ -64,6 +74,8 @@ class CourtController extends Controller
                 $result[] = [
                     'id' => $court->id,
                     'name' => $court->name,
+                    'hourly_rate' => $court->hourly_rate,
+                    'reservation_fee_percentage' => $court->reservation_fee_percentage ?? 0,
                     'slots' => $slots,
                 ];
             }
