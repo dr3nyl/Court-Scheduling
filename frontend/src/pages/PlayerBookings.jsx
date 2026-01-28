@@ -176,7 +176,7 @@ export default function PlayerBookings() {
     // Filter by date search if provided
     const filteredDates = dateSearch
       ? sortedDates.filter((dateStr) => {
-          const date = new Date(dateStr);
+          // const date = new Date(dateStr);
           const searchLower = dateSearch.toLowerCase();
           return (
             formatDateShort(dateStr).toLowerCase().includes(searchLower) ||
@@ -433,7 +433,7 @@ export default function PlayerBookings() {
             const isExpanded = expandedDates.has(date);
             const isDateUpcoming = dateBookings.some(isUpcoming);
             const isDateToday = isToday(date);
-            const isDatePast = !isDateUpcoming && !isDateToday;
+            // const isDatePast = !isDateUpcoming && !isDateToday;
 
             return (
               <div

@@ -292,7 +292,7 @@ export default function OwnerBookings() {
           const isExpanded = expandedDates.has(group.key);
           const isDateToday = isToday(group.key);
           const isDateUpcoming = group.bookings.some((b) => isUpcoming(b));
-          const isDatePast = !isDateUpcoming && !isDateToday;
+          // const isDatePast = !isDateUpcoming && !isDateToday;
 
           return (
             <div
@@ -608,7 +608,7 @@ export default function OwnerBookings() {
               return <div key={`empty-${index}`} style={{ minHeight: "100px" }} />;
             }
 
-            const { date, dateStr, day, bookings: dayBookings, count } = dayData;
+            const { dateStr, day, bookings: dayBookings, count } = dayData;
             const isTodayDate = isToday(dateStr);
             const isPast = new Date(dateStr) < new Date().setHours(0, 0, 0, 0);
 
