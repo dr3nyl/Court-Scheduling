@@ -15,6 +15,16 @@ export default function OwnerBookings() {
   const [cancellingId, setCancellingId] = useState(null);
   const [expandedDates, setExpandedDates] = useState(new Set());
   const [selectedBooking, setSelectedBooking] = useState(null); // For detail modal
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const loadBookings = useCallback(async () => {
     try {
@@ -310,7 +320,7 @@ export default function OwnerBookings() {
                 onClick={() => toggleDate(group.key)}
                 style={{
                   width: "100%",
-                  padding: "1.25rem 1.5rem",
+                  padding: isMobile ? "1rem" : "1.25rem 1.5rem",
                   backgroundColor: "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -320,10 +330,10 @@ export default function OwnerBookings() {
                   textAlign: "left",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", flex: 1, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "0.5rem" : "1rem", flex: 1, flexWrap: "wrap" }}>
                   <div
                     style={{
-                      fontSize: "1.5rem",
+                      fontSize: isMobile ? "1.1rem" : "1.5rem",
                       fontWeight: 600,
                       color: "#111827",
                     }}
@@ -568,11 +578,12 @@ export default function OwnerBookings() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "0.5rem",
+            gap: isMobile ? "0.25rem" : "0.5rem",
             backgroundColor: "#ffffff",
-            padding: "1rem",
+            padding: isMobile ? "0.5rem" : "1rem",
             borderRadius: "0.75rem",
             border: "1px solid #e5e7eb",
+            overflowX: "auto",
           }}
         >
           {/* Day Headers */}
@@ -580,11 +591,11 @@ export default function OwnerBookings() {
             <div
               key={day}
               style={{
-                padding: "0.75rem",
+                padding: isMobile ? "0.5rem 0.25rem" : "0.75rem",
                 textAlign: "center",
                 fontWeight: 600,
                 color: "#6b7280",
-                fontSize: "0.9rem",
+                fontSize: isMobile ? "0.75rem" : "0.9rem",
               }}
             >
               {day}
@@ -610,8 +621,8 @@ export default function OwnerBookings() {
                   }
                 }}
                 style={{
-                  minHeight: "100px",
-                  padding: "0.5rem",
+                  minHeight: isMobile ? "60px" : "100px",
+                  padding: isMobile ? "0.25rem" : "0.5rem",
                   border: `2px solid ${isTodayDate ? "#2563eb" : "#e5e7eb"}`,
                   borderRadius: "0.5rem",
                   backgroundColor: isTodayDate ? "#eff6ff" : "#ffffff",
@@ -686,11 +697,11 @@ export default function OwnerBookings() {
   return (
     <OwnerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           All Bookings
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           View and manage bookings across all your courts
         </p>
       </div>
@@ -701,14 +712,14 @@ export default function OwnerBookings() {
           display: "flex",
           gap: "0.5rem",
           marginBottom: "1.5rem",
-          padding: "0.75rem",
+          padding: isMobile ? "0.5rem" : "0.75rem",
           backgroundColor: "#f9fafb",
           borderRadius: "0.5rem",
           border: "1px solid #e5e7eb",
           flexWrap: "wrap",
         }}
       >
-        <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#374151", alignSelf: "center" }}>
+        <span style={{ fontSize: isMobile ? "0.85rem" : "0.9rem", fontWeight: 500, color: "#374151", alignSelf: "center", width: isMobile ? "100%" : "auto" }}>
           View:
         </span>
         {[
@@ -719,23 +730,24 @@ export default function OwnerBookings() {
             key={view.key}
             onClick={() => setViewMode(view.key)}
             style={{
-              padding: "0.75rem 1.25rem",
+              padding: isMobile ? "0.5rem 0.75rem" : "0.75rem 1.25rem",
               backgroundColor: viewMode === view.key ? "#2563eb" : "#ffffff",
               color: viewMode === view.key ? "#ffffff" : "#374151",
               border: `1px solid ${viewMode === view.key ? "#2563eb" : "#d1d5db"}`,
               borderRadius: "0.375rem",
               cursor: "pointer",
               fontWeight: viewMode === view.key ? 600 : 500,
-              fontSize: "0.9rem",
+              fontSize: isMobile ? "0.85rem" : "0.9rem",
               display: "flex",
-              flexDirection: "column",
+              flexDirection: isMobile ? "row" : "column",
               alignItems: "center",
               gap: "0.25rem",
+              flex: isMobile ? 1 : "none",
             }}
             title={view.desc}
           >
             <span>{view.label}</span>
-            <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>{view.desc}</span>
+            {!isMobile && <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>{view.desc}</span>}
           </button>
         ))}
       </div>
@@ -749,6 +761,10 @@ export default function OwnerBookings() {
             marginBottom: "1rem",
             borderBottom: "2px solid #e5e7eb",
             flexWrap: "wrap",
+            overflowX: isMobile ? "auto" : "visible",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
           }}
         >
           {[
@@ -764,15 +780,17 @@ export default function OwnerBookings() {
                 setDateFilter("");
               }}
               style={{
-                padding: "0.75rem 1.5rem",
+                padding: isMobile ? "0.5rem 1rem" : "0.75rem 1.5rem",
                 backgroundColor: "transparent",
                 border: "none",
                 borderBottom: filter === tab.key ? "2px solid #2563eb" : "2px solid transparent",
                 color: filter === tab.key ? "#2563eb" : "#6b7280",
                 fontWeight: filter === tab.key ? 600 : 500,
                 cursor: "pointer",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.85rem" : "0.95rem",
                 marginBottom: "-2px",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
             >
               {tab.label}
@@ -799,21 +817,22 @@ export default function OwnerBookings() {
             <button
               onClick={jumpToToday}
               style={{
-                padding: "0.5rem 1rem",
+                padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 1rem",
                 backgroundColor: "#2563eb",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: "0.5rem",
                 cursor: "pointer",
                 fontWeight: 500,
-                fontSize: "0.9rem",
+                fontSize: isMobile ? "0.85rem" : "0.9rem",
                 display: "flex",
                 alignItems: "center",
                 gap: "0.5rem",
+                whiteSpace: "nowrap",
               }}
             >
               <span>📅</span>
-              Jump to Today
+              {!isMobile && "Jump to Today"}
             </button>
           )}
           
@@ -821,11 +840,13 @@ export default function OwnerBookings() {
             value={courtFilter}
             onChange={(e) => setCourtFilter(e.target.value)}
             style={{
-              padding: "0.5rem 0.75rem",
+              padding: isMobile ? "0.5rem 0.5rem" : "0.5rem 0.75rem",
               borderRadius: "0.375rem",
               border: "1px solid #d1d5db",
-              fontSize: "0.9rem",
+              fontSize: isMobile ? "0.85rem" : "0.9rem",
               backgroundColor: "#ffffff",
+              flex: isMobile ? 1 : "none",
+              minWidth: isMobile ? "120px" : "auto",
             }}
           >
             <option value="all">All Courts</option>
@@ -845,10 +866,12 @@ export default function OwnerBookings() {
                 setFilter("all");
               }}
               style={{
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem 0.5rem" : "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                fontSize: "0.9rem",
+                fontSize: isMobile ? "0.85rem" : "0.9rem",
+                flex: isMobile ? 1 : "none",
+                minWidth: isMobile ? "140px" : "auto",
               }}
             />
           )}
@@ -860,14 +883,15 @@ export default function OwnerBookings() {
                 setCourtFilter("all");
               }}
               style={{
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 0.75rem",
                 backgroundColor: "#f3f4f6",
                 color: "#374151",
                 border: "none",
                 borderRadius: "0.375rem",
                 cursor: "pointer",
-                fontSize: "0.85rem",
+                fontSize: isMobile ? "0.8rem" : "0.85rem",
                 fontWeight: 500,
+                whiteSpace: "nowrap",
               }}
             >
               Clear Filters
@@ -942,7 +966,7 @@ export default function OwnerBookings() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: "1rem",
+            padding: isMobile ? "0.5rem" : "1rem",
           }}
           onClick={() => setSelectedBooking(null)}
         >
@@ -950,10 +974,10 @@ export default function OwnerBookings() {
             style={{
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
-              padding: "2rem",
+              padding: isMobile ? "1rem" : "2rem",
               maxWidth: "600px",
               width: "100%",
-              maxHeight: "80vh",
+              maxHeight: "90vh",
               overflowY: "auto",
               boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
             }}
@@ -965,9 +989,11 @@ export default function OwnerBookings() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 marginBottom: "1.5rem",
+                flexWrap: "wrap",
+                gap: "0.5rem",
               }}
             >
-              <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#111827", margin: 0 }}>
+              <h2 style={{ fontSize: isMobile ? "1.25rem" : "1.5rem", fontWeight: 600, color: "#111827", margin: 0 }}>
                 {formatDate(selectedBooking.date)}
               </h2>
               <button

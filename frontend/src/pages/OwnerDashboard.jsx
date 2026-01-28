@@ -19,6 +19,16 @@ export default function OwnerDashboard() {
   const [todayBookings, setTodayBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     loadDashboardData();
@@ -52,11 +62,11 @@ export default function OwnerDashboard() {
   return (
     <OwnerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           Welcome back, {user?.name}!
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           Manage your courts and track bookings
         </p>
       </div>
@@ -69,7 +79,7 @@ export default function OwnerDashboard() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
             gap: "1rem",
           }}
         >
@@ -77,14 +87,14 @@ export default function OwnerDashboard() {
             to="/owner/courts"
             style={{
               display: "block",
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#2563eb",
               color: "#ffffff",
               borderRadius: "0.75rem",
               textDecoration: "none",
               textAlign: "center",
               fontWeight: 600,
-              fontSize: "1.1rem",
+              fontSize: isMobile ? "1rem" : "1.1rem",
               boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               transition: "transform 0.2s, box-shadow 0.2s",
             }}
@@ -103,14 +113,14 @@ export default function OwnerDashboard() {
             to="/owner/bookings"
             style={{
               display: "block",
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               color: "#374151",
               borderRadius: "0.75rem",
               textDecoration: "none",
               textAlign: "center",
               fontWeight: 600,
-              fontSize: "1.1rem",
+              fontSize: isMobile ? "1rem" : "1.1rem",
               border: "2px solid #e5e7eb",
               transition: "border-color 0.2s",
             }}
@@ -134,90 +144,90 @@ export default function OwnerDashboard() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "1rem",
           }}
         >
           <div
             style={{
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
               border: "1px solid #e5e7eb",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
               Total Courts
             </div>
-            <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827" }}>
+            <div style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827" }}>
               {loading ? "..." : stats.total_courts}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#16a34a", marginTop: "0.25rem" }}>
+            <div style={{ fontSize: isMobile ? "0.7rem" : "0.75rem", color: "#16a34a", marginTop: "0.25rem" }}>
               {stats.active_courts} active
             </div>
           </div>
           <div
             style={{
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
               border: "1px solid #e5e7eb",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
               Today's Bookings
             </div>
-            <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#2563eb" }}>
+            <div style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#2563eb" }}>
               {loading ? "..." : stats.today_bookings}
             </div>
           </div>
           <div
             style={{
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
               border: "1px solid #e5e7eb",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
               This Week
             </div>
-            <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#16a34a" }}>
+            <div style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#16a34a" }}>
               {loading ? "..." : stats.this_week_bookings}
             </div>
           </div>
           <div
             style={{
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
               border: "1px solid #e5e7eb",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
               This Month
             </div>
-            <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#7c3aed" }}>
+            <div style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#7c3aed" }}>
               {loading ? "..." : stats.this_month_bookings}
             </div>
           </div>
           <div
             style={{
-              padding: "1.5rem",
+              padding: isMobile ? "1rem" : "1.5rem",
               backgroundColor: "#ffffff",
               borderRadius: "0.75rem",
               border: "1px solid #e5e7eb",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>
               Upcoming
             </div>
-            <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#ea580c" }}>
+            <div style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#ea580c" }}>
               {loading ? "..." : stats.upcoming_bookings}
             </div>
           </div>
@@ -226,8 +236,8 @@ export default function OwnerDashboard() {
 
       {/* Today's Bookings */}
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <h2 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, color: "#111827" }}>
             Today's Bookings
           </h2>
           {todayBookings.length > 0 && (
@@ -295,11 +305,11 @@ export default function OwnerDashboard() {
                   alignItems: "center",
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "1.1rem", color: "#111827", marginBottom: "0.25rem" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: isMobile ? "1rem" : "1.1rem", color: "#111827", marginBottom: "0.25rem" }}>
                     {booking.court?.name || "Court"}
                   </div>
-                  <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+                  <div style={{ color: "#6b7280", fontSize: isMobile ? "0.85rem" : "0.9rem", wordBreak: "break-word" }}>
                     {formatTime(booking.start_time)} - {formatTime(booking.end_time)} • {booking.user?.name || "Guest"}
                   </div>
                 </div>

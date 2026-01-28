@@ -12,6 +12,16 @@ export default function OwnerCourts() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     loadCourts();
@@ -88,11 +98,11 @@ export default function OwnerCourts() {
   return (
     <OwnerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           My Courts
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           Manage your courts and their availability schedules
         </p>
       </div>
@@ -111,11 +121,11 @@ export default function OwnerCourts() {
           Add New Court
         </h2>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: 1, minWidth: "200px" }}>
+          <div style={{ flex: 1, minWidth: isMobile ? "100%" : "200px" }}>
             <label
               style={{
                 display: "block",
-                fontSize: "0.875rem",
+                fontSize: isMobile ? "0.8rem" : "0.875rem",
                 fontWeight: 500,
                 color: "#374151",
                 marginBottom: "0.5rem",
@@ -134,10 +144,10 @@ export default function OwnerCourts() {
               onKeyPress={(e) => e.key === "Enter" && addCourt()}
               style={{
                 width: "100%",
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
               }}
             />
           </div>
@@ -145,15 +155,16 @@ export default function OwnerCourts() {
             onClick={addCourt}
             disabled={loading}
             style={{
-              padding: "0.5rem 1.5rem",
+              padding: isMobile ? "0.5rem 1rem" : "0.5rem 1.5rem",
               backgroundColor: "#2563eb",
               color: "#ffffff",
               border: "none",
               borderRadius: "0.375rem",
               cursor: loading ? "not-allowed" : "pointer",
               fontWeight: 500,
-              fontSize: "0.95rem",
+              fontSize: isMobile ? "0.9rem" : "0.95rem",
               opacity: loading ? 0.6 : 1,
+              width: isMobile ? "100%" : "auto",
             }}
           >
             {loading ? "Adding..." : "Add Court"}
@@ -253,82 +264,42 @@ export default function OwnerCourts() {
             backgroundColor: "#ffffff",
             borderRadius: "0.75rem",
             border: "1px solid #e5e7eb",
-            overflow: "hidden",
+            overflow: isMobile ? "visible" : "hidden",
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  Court Name
-                </th>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  Status
-                </th>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          {isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem" }}>
               {courts.map((court) => (
-                <tr
+                <div
                   key={court.id}
                   style={{
-                    borderBottom: "1px solid #e5e7eb",
-                    transition: "background-color 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f9fafb";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#ffffff";
+                    padding: "1rem",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
                   }}
                 >
-                  <td style={{ padding: "1rem" }}>
-                    {editingId === court.id ? (
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        style={{
-                          padding: "0.5rem 0.75rem",
-                          borderRadius: "0.375rem",
-                          border: "1px solid #d1d5db",
-                          fontSize: "0.95rem",
-                          width: "100%",
-                          maxWidth: "300px",
-                        }}
-                      />
-                    ) : (
-                      <span style={{ fontWeight: 500, color: "#111827" }}>{court.name}</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "1rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{ flex: 1 }}>
+                      {editingId === court.id ? (
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          style={{
+                            padding: "0.5rem 0.75rem",
+                            borderRadius: "0.375rem",
+                            border: "1px solid #d1d5db",
+                            fontSize: "0.95rem",
+                            width: "100%",
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontWeight: 600, color: "#111827", fontSize: "1rem" }}>{court.name}</span>
+                      )}
+                    </div>
                     {editingId === court.id ? (
                       <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
                         <input
@@ -352,10 +323,10 @@ export default function OwnerCourts() {
                         {court.is_active !== false ? "Active" : "Inactive"}
                       </span>
                     )}
-                  </td>
-                  <td style={{ padding: "1rem" }}>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                     {editingId === court.id ? (
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <>
                         <button
                           onClick={() => saveEdit(court.id)}
                           style={{
@@ -367,6 +338,7 @@ export default function OwnerCourts() {
                             cursor: "pointer",
                             fontSize: "0.85rem",
                             fontWeight: 500,
+                            flex: 1,
                           }}
                         >
                           Save
@@ -382,13 +354,14 @@ export default function OwnerCourts() {
                             cursor: "pointer",
                             fontSize: "0.85rem",
                             fontWeight: 500,
+                            flex: 1,
                           }}
                         >
                           Cancel
                         </button>
-                      </div>
+                      </>
                     ) : (
-                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <>
                         <Link
                           to={`/owner/courts/${court.id}/schedule`}
                           style={{
@@ -399,6 +372,8 @@ export default function OwnerCourts() {
                             textDecoration: "none",
                             fontSize: "0.85rem",
                             fontWeight: 500,
+                            flex: 1,
+                            textAlign: "center",
                           }}
                         >
                           Schedule
@@ -414,17 +389,188 @@ export default function OwnerCourts() {
                             cursor: "pointer",
                             fontSize: "0.85rem",
                             fontWeight: 500,
+                            flex: 1,
                           }}
                         >
                           Edit
                         </button>
-                      </div>
+                      </>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                  <th
+                    style={{
+                      padding: "1rem",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    Court Name
+                  </th>
+                  <th
+                    style={{
+                      padding: "1rem",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    Status
+                  </th>
+                  <th
+                    style={{
+                      padding: "1rem",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {courts.map((court) => (
+                  <tr
+                    key={court.id}
+                    style={{
+                      borderBottom: "1px solid #e5e7eb",
+                      transition: "background-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#ffffff";
+                    }}
+                  >
+                    <td style={{ padding: "1rem" }}>
+                      {editingId === court.id ? (
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          style={{
+                            padding: "0.5rem 0.75rem",
+                            borderRadius: "0.375rem",
+                            border: "1px solid #d1d5db",
+                            fontSize: "0.95rem",
+                            width: "100%",
+                            maxWidth: "300px",
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontWeight: 500, color: "#111827" }}>{court.name}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "1rem" }}>
+                      {editingId === court.id ? (
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={editActive}
+                            onChange={(e) => setEditActive(e.target.checked)}
+                          />
+                          <span style={{ fontSize: "0.875rem", color: "#374151" }}>Active</span>
+                        </label>
+                      ) : (
+                        <span
+                          style={{
+                            padding: "0.25rem 0.75rem",
+                            backgroundColor: court.is_active !== false ? "#dcfce7" : "#fee2e2",
+                            color: court.is_active !== false ? "#166534" : "#991b1b",
+                            borderRadius: "999px",
+                            fontSize: "0.85rem",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {court.is_active !== false ? "Active" : "Inactive"}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: "1rem" }}>
+                      {editingId === court.id ? (
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button
+                            onClick={() => saveEdit(court.id)}
+                            style={{
+                              padding: "0.4rem 0.75rem",
+                              backgroundColor: "#16a34a",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            style={{
+                              padding: "0.4rem 0.75rem",
+                              backgroundColor: "#f3f4f6",
+                              color: "#374151",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <Link
+                            to={`/owner/courts/${court.id}/schedule`}
+                            style={{
+                              padding: "0.4rem 0.75rem",
+                              backgroundColor: "#2563eb",
+                              color: "#ffffff",
+                              borderRadius: "0.375rem",
+                              textDecoration: "none",
+                              fontSize: "0.85rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Schedule
+                          </Link>
+                          <button
+                            onClick={() => startEdit(court)}
+                            style={{
+                              padding: "0.4rem 0.75rem",
+                              backgroundColor: "#f3f4f6",
+                              color: "#374151",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </OwnerLayout>

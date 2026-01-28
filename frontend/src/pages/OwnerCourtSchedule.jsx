@@ -18,6 +18,16 @@ export default function OwnerCourtSchedule() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -152,27 +162,27 @@ export default function OwnerCourtSchedule() {
   return (
     <OwnerLayout>
       {/* Page Header */}
-      <div style={{ marginBottom: "2rem" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "2rem" }}>
         <button
           onClick={() => navigate("/owner/courts")}
           style={{
             marginBottom: "1rem",
-            padding: "0.5rem 1rem",
+            padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 1rem",
             backgroundColor: "#f3f4f6",
             color: "#374151",
             border: "none",
             borderRadius: "0.375rem",
             cursor: "pointer",
-            fontSize: "0.9rem",
+            fontSize: isMobile ? "0.85rem" : "0.9rem",
             fontWeight: 500,
           }}
         >
           ← Back to Courts
         </button>
-        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>
           {court?.name || "Court"} Schedule
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "1rem" }}>
+        <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           Set weekly availability hours for this court
         </p>
       </div>
@@ -190,12 +200,12 @@ export default function OwnerCourtSchedule() {
         <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
           Add Schedule
         </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
           <div>
             <label
               style={{
                 display: "block",
-                fontSize: "0.875rem",
+                fontSize: isMobile ? "0.8rem" : "0.875rem",
                 fontWeight: 500,
                 color: "#374151",
                 marginBottom: "0.5rem",
@@ -211,10 +221,10 @@ export default function OwnerCourtSchedule() {
               }}
               style={{
                 width: "100%",
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
                 backgroundColor: "#ffffff",
                 cursor: "pointer",
               }}
@@ -233,7 +243,7 @@ export default function OwnerCourtSchedule() {
             <label
               style={{
                 display: "block",
-                fontSize: "0.875rem",
+                fontSize: isMobile ? "0.8rem" : "0.875rem",
                 fontWeight: 500,
                 color: "#374151",
                 marginBottom: "0.5rem",
@@ -250,10 +260,10 @@ export default function OwnerCourtSchedule() {
               }}
               style={{
                 width: "100%",
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
               }}
             />
           </div>
@@ -261,7 +271,7 @@ export default function OwnerCourtSchedule() {
             <label
               style={{
                 display: "block",
-                fontSize: "0.875rem",
+                fontSize: isMobile ? "0.8rem" : "0.875rem",
                 fontWeight: 500,
                 color: "#374151",
                 marginBottom: "0.5rem",
@@ -278,10 +288,10 @@ export default function OwnerCourtSchedule() {
               }}
               style={{
                 width: "100%",
-                padding: "0.5rem 0.75rem",
+                padding: isMobile ? "0.5rem" : "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
               }}
             />
           </div>
@@ -291,14 +301,14 @@ export default function OwnerCourtSchedule() {
               disabled={loading}
               style={{
                 width: "100%",
-                padding: "0.5rem 1rem",
+                padding: isMobile ? "0.5rem 0.75rem" : "0.5rem 1rem",
                 backgroundColor: "#2563eb",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: "0.375rem",
                 cursor: loading ? "not-allowed" : "pointer",
                 fontWeight: 500,
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.9rem" : "0.95rem",
                 opacity: loading ? 0.6 : 1,
               }}
             >
@@ -410,11 +420,13 @@ export default function OwnerCourtSchedule() {
                 <div
                   key={day}
                   style={{
-                    padding: "1.25rem 1.5rem",
+                    padding: isMobile ? "1rem" : "1.25rem 1.5rem",
                     borderBottom: "1px solid #e5e7eb",
                     display: "flex",
+                    flexDirection: isMobile ? "column" : "row",
                     justifyContent: "space-between",
-                    alignItems: "center",
+                    alignItems: isMobile ? "flex-start" : "center",
+                    gap: isMobile ? "0.75rem" : "0",
                     transition: "background-color 0.15s",
                   }}
                   onMouseEnter={(e) => {
@@ -424,8 +436,8 @@ export default function OwnerCourtSchedule() {
                     e.currentTarget.style.backgroundColor = "#ffffff";
                   }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.5rem" }}>
+                  <div style={{ flex: 1, width: "100%" }}>
+                    <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.5rem", fontSize: isMobile ? "0.95rem" : "1rem" }}>
                       {dayName(day)}
                     </div>
                     {isEditing ? (
@@ -435,49 +447,52 @@ export default function OwnerCourtSchedule() {
                           value={editOpenTime}
                           onChange={(e) => setEditOpenTime(e.target.value)}
                           style={{
-                            padding: "0.4rem 0.6rem",
+                            padding: isMobile ? "0.4rem" : "0.4rem 0.6rem",
                             borderRadius: "0.375rem",
                             border: "1px solid #d1d5db",
-                            fontSize: "0.9rem",
+                            fontSize: isMobile ? "0.85rem" : "0.9rem",
+                            flex: isMobile ? 1 : "none",
                           }}
                         />
-                        <span style={{ color: "#6b7280" }}>to</span>
+                        <span style={{ color: "#6b7280", fontSize: isMobile ? "0.85rem" : "0.9rem" }}>to</span>
                         <input
                           type="time"
                           value={editCloseTime}
                           onChange={(e) => setEditCloseTime(e.target.value)}
                           style={{
-                            padding: "0.4rem 0.6rem",
+                            padding: isMobile ? "0.4rem" : "0.4rem 0.6rem",
                             borderRadius: "0.375rem",
                             border: "1px solid #d1d5db",
-                            fontSize: "0.9rem",
+                            fontSize: isMobile ? "0.85rem" : "0.9rem",
+                            flex: isMobile ? 1 : "none",
                           }}
                         />
                       </div>
                     ) : schedule ? (
-                      <div style={{ color: "#6b7280", fontSize: "0.95rem" }}>
+                      <div style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "0.95rem" }}>
                         {schedule.open_time} - {schedule.close_time}
                       </div>
                     ) : (
-                      <div style={{ color: "#9ca3af", fontSize: "0.9rem", fontStyle: "italic" }}>
+                      <div style={{ color: "#9ca3af", fontSize: isMobile ? "0.85rem" : "0.9rem", fontStyle: "italic" }}>
                         No schedule set
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
                     {isEditing ? (
                       <>
                         <button
                           onClick={() => saveEdit(schedule.id)}
                           style={{
-                            padding: "0.4rem 0.75rem",
+                            padding: isMobile ? "0.4rem 0.75rem" : "0.4rem 0.75rem",
                             backgroundColor: "#16a34a",
                             color: "#ffffff",
                             border: "none",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
-                            fontSize: "0.85rem",
+                            fontSize: isMobile ? "0.8rem" : "0.85rem",
                             fontWeight: 500,
+                            flex: isMobile ? 1 : "none",
                           }}
                         >
                           Save
@@ -485,14 +500,15 @@ export default function OwnerCourtSchedule() {
                         <button
                           onClick={cancelEdit}
                           style={{
-                            padding: "0.4rem 0.75rem",
+                            padding: isMobile ? "0.4rem 0.75rem" : "0.4rem 0.75rem",
                             backgroundColor: "#f3f4f6",
                             color: "#374151",
                             border: "none",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
-                            fontSize: "0.85rem",
+                            fontSize: isMobile ? "0.8rem" : "0.85rem",
                             fontWeight: 500,
+                            flex: isMobile ? 1 : "none",
                           }}
                         >
                           Cancel
@@ -503,14 +519,15 @@ export default function OwnerCourtSchedule() {
                         <button
                           onClick={() => startEdit(schedule)}
                           style={{
-                            padding: "0.4rem 0.75rem",
+                            padding: isMobile ? "0.4rem 0.75rem" : "0.4rem 0.75rem",
                             backgroundColor: "#f3f4f6",
                             color: "#374151",
                             border: "none",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
-                            fontSize: "0.85rem",
+                            fontSize: isMobile ? "0.8rem" : "0.85rem",
                             fontWeight: 500,
+                            flex: isMobile ? 1 : "none",
                           }}
                         >
                           Edit
@@ -518,14 +535,15 @@ export default function OwnerCourtSchedule() {
                         <button
                           onClick={() => handleDelete(schedule.id)}
                           style={{
-                            padding: "0.4rem 0.75rem",
+                            padding: isMobile ? "0.4rem 0.75rem" : "0.4rem 0.75rem",
                             backgroundColor: "#fee2e2",
                             color: "#991b1b",
                             border: "none",
                             borderRadius: "0.375rem",
                             cursor: "pointer",
-                            fontSize: "0.85rem",
+                            fontSize: isMobile ? "0.8rem" : "0.85rem",
                             fontWeight: 500,
+                            flex: isMobile ? 1 : "none",
                           }}
                         >
                           Delete
