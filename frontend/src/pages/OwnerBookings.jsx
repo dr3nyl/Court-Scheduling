@@ -488,7 +488,7 @@ export default function OwnerBookings() {
                         >
                           {courtGroup.players?.map((playerGroup) => {
                             const playerBookings = playerGroup.bookings;
-                            const hasUpcoming = playerBookings.some((b) => isUpcoming(b) && b.status !== "cancelled");
+                            // const hasUpcoming = playerBookings.some((b) => isUpcoming(b) && b.status !== "cancelled");
                             const hasCancelled = playerBookings.some((b) => b.status === "cancelled");
                             const allCancelled = playerBookings.every((b) => b.status === "cancelled");
 
@@ -1279,7 +1279,7 @@ export default function OwnerBookings() {
                     >
                       {courtGroup.players?.map((playerGroup) => {
                         const playerBookings = playerGroup.bookings;
-                        const hasUpcoming = playerBookings.some((b) => isUpcoming(b) && b.status !== "cancelled");
+                        // const hasUpcoming = playerBookings.some((b) => isUpcoming(b) && b.status !== "cancelled");
                         const hasCancelled = playerBookings.some((b) => b.status === "cancelled");
                         const allCancelled = playerBookings.every((b) => b.status === "cancelled");
 

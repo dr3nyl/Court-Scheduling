@@ -319,7 +319,7 @@ export default function PlayerBooking() {
 
             {/* Cost Breakdown */}
             {(() => {
-              const { subtotal, reservationFee, reservationFeePercentage, total, amountToPay, remainingBalance } = calculateCosts();
+              const { reservationFee, reservationFeePercentage, total, amountToPay, remainingBalance } = calculateCosts();
               return (
                 <div
                   style={{

@@ -568,7 +568,7 @@ export default function PlayerBookings() {
                     >
                       {courts?.map((courtGroup) => {
                         const courtBookings = courtGroup.bookings;
-                        const hasUpcoming = courtBookings.some(isUpcoming);
+                        // const hasUpcoming = courtBookings.some(isUpcoming);
                         const hasCancelled = courtBookings.some((b) => b.status === "cancelled");
                         const allCancelled = courtBookings.every((b) => b.status === "cancelled");
 
