@@ -35,6 +35,9 @@ class CourtBookingResource extends JsonResource
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
             'status' => $this->status,
+            'shuttlecock_count' => $this->shuttlecock_count,
+            'started_at' => $this->started_at?->toISOString(),
+            'payment_status' => $this->payment_status ?? 'reserved',
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

@@ -152,6 +152,7 @@ export default function PlayerBooking() {
           date,
           start_time: slot.start,
           end_time: slot.end,
+          payment_status: paymentOption === "full" ? "paid" : "reserved",
         })
       );
 

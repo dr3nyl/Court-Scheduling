@@ -79,6 +79,43 @@ class CourtBookingController extends Controller
     }
 
     /**
+     * Owner: update a booking (shuttlecock count, start session).
+     */
+    public function ownerUpdateBooking(Request $request, CourtBooking $booking)
+    {
+        $court = $booking->court;
+        if (!$court || $court->owner_id !== Auth::id()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $request->validate([
+            'shuttlecock_count' => 'nullable|integer|min:0',
+            'start_session' => 'nullable|boolean',
+            'payment_status' => 'nullable|in:reserved,paid',
+        ]);
+
+        if ($request->has('shuttlecock_count')) {
+            $booking->shuttlecock_count = $request->shuttlecock_count === '' || $request->shuttlecock_count === null
+                ? null
+                : (int) $request->shuttlecock_count;
+        }
+
+        if ($request->boolean('start_session')) {
+            $booking->started_at = $booking->started_at ?? Carbon::now();
+        }
+
+        if ($request->has('payment_status')) {
+            $booking->payment_status = $request->payment_status;
+        }
+
+        $booking->save();
+
+        $booking->load(['court:id,name', 'user:id,name,email']);
+
+        return new CourtBookingResource($booking);
+    }
+
+    /**
      * Get owner statistics
      */
     public function ownerStats(Request $request)
@@ -228,6 +265,7 @@ class CourtBookingController extends Controller
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'status' => 'confirmed',
+            'payment_status' => $request->payment_status ?? 'reserved',
         ]);
 
         return new CourtBookingResource($booking->load('court', 'user'));

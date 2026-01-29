@@ -5,16 +5,22 @@ import OwnerLayout from "../components/OwnerLayout";
 export default function OwnerBookings() {
   const [bookings, setBookings] = useState([]);
   const [courts, setCourts] = useState([]);
-  const [viewMode, setViewMode] = useState("grouped"); // 'grouped' or 'calendar'
+  const [viewMode, setViewMode] = useState("schedule"); // 'schedule', 'grouped', or 'calendar'
   const [filter, setFilter] = useState("all"); // 'all', 'upcoming', 'today', 'cancelled'
   const [dateFilter, setDateFilter] = useState("");
   const [courtFilter, setCourtFilter] = useState("all");
   const [selectedDate, setSelectedDate] = useState(new Date()); // For calendar
+  const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10)); // YYYY-MM-DD for schedule grid
+  const [courtAvailabilities, setCourtAvailabilities] = useState({}); // { courtId: [{ day_of_week, open_time, close_time }] }
+  const [collapsedScheduleCourts, setCollapsedScheduleCourts] = useState(new Set()); // court IDs that are collapsed in schedule view
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancellingId, setCancellingId] = useState(null);
   const [expandedDates, setExpandedDates] = useState(new Set());
   const [selectedBooking, setSelectedBooking] = useState(null); // For detail modal
+  const [scheduleBookingModal, setScheduleBookingModal] = useState(null); // { booking, slot, shuttlecockCount } for schedule grid card click
+  const [startingSessionId, setStartingSessionId] = useState(null); // booking id while PATCH start session in progress
+  const [markingPaidId, setMarkingPaidId] = useState(null); // booking id while PATCH payment_status in progress
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -33,16 +39,20 @@ export default function OwnerBookings() {
       let url = "/owner/bookings";
       const params = [];
 
-      if (filter === "upcoming") {
-        params.push("upcoming=true");
-      } else if (filter === "today") {
-        params.push(`date=${new Date().toISOString().slice(0, 10)}`);
-      } else if (filter === "cancelled") {
-        params.push("status=cancelled");
-      }
-
-      if (dateFilter) {
-        params.push(`date=${dateFilter}`);
+      // Schedule grid view: always load by selected date
+      if (viewMode === "schedule") {
+        params.push(`date=${scheduleDate}`);
+      } else {
+        if (filter === "upcoming") {
+          params.push("upcoming=true");
+        } else if (filter === "today") {
+          params.push(`date=${new Date().toISOString().slice(0, 10)}`);
+        } else if (filter === "cancelled") {
+          params.push("status=cancelled");
+        }
+        if (dateFilter) {
+          params.push(`date=${dateFilter}`);
+        }
       }
 
       if (params.length > 0) {
@@ -58,12 +68,27 @@ export default function OwnerBookings() {
     } finally {
       setLoading(false);
     }
-  }, [filter, dateFilter]);
+  }, [filter, dateFilter, viewMode, scheduleDate]);
 
   const loadCourts = useCallback(async () => {
     try {
       const res = await api.get("/courts");
-      setCourts(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
+      const list = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      setCourts(list);
+      // Load availability for each court (for schedule grid)
+      const availMap = {};
+      await Promise.all(
+        list.map(async (court) => {
+          try {
+            const avRes = await api.get(`/owner/courts/${court.id}/availability`);
+            const avList = Array.isArray(avRes.data) ? avRes.data : (avRes.data?.data ?? []);
+            availMap[court.id] = avList;
+          } catch {
+            availMap[court.id] = [];
+          }
+        })
+      );
+      setCourtAvailabilities(availMap);
     } catch (err) {
       console.error(err);
     }
@@ -140,6 +165,52 @@ export default function OwnerBookings() {
     return timeString.slice(0, 5);
   };
 
+  // "08:00" -> "8:00 AM" for schedule grid display
+  const formatTime12 = (timeString) => {
+    const [h, m] = (timeString || "00:00").slice(0, 5).split(":").map(Number);
+    const hour = h % 12 || 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+
+  // Generate hourly slots for a court on a date from its availability (day_of_week)
+  const getSlotsForCourtOnDate = useCallback(
+    (courtId, dateStr) => {
+      const avails = courtAvailabilities[courtId] || [];
+      const date = new Date(dateStr + "T12:00:00");
+      const dayOfWeek = date.getDay();
+      const forDay = avails.find((a) => a.day_of_week === dayOfWeek);
+      if (!forDay) return [];
+      const slots = [];
+      const [openH, openM] = forDay.open_time.slice(0, 5).split(":").map(Number);
+      const [closeH, closeM] = forDay.close_time.slice(0, 5).split(":").map(Number);
+      const openMin = openH * 60 + openM;
+      const closeMin = closeH * 60 + closeM;
+      if (closeMin <= openMin) return [];
+      for (let t = openMin; t < closeMin; t += 60) {
+        const h = Math.floor(t / 60);
+        const m = t % 60;
+        const endMin = t + 60;
+        const endH = Math.floor(endMin / 60);
+        const endM = endMin % 60;
+        slots.push({
+          start: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+          end: `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+        });
+      }
+      return slots;
+    },
+    [courtAvailabilities]
+  );
+
+  const slotOverlapsBooking = (slot, booking) => {
+    return slot.start < (booking.end_time || "").slice(0, 5) && slot.end > (booking.start_time || "").slice(0, 5);
+  };
+
+  const getBookingForSlot = (slot, courtBookings) => {
+    return courtBookings.find((b) => slotOverlapsBooking(slot, b)) || null;
+  };
+
   const isUpcoming = (booking) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -154,6 +225,24 @@ export default function OwnerBookings() {
     const date = new Date(dateString);
     date.setHours(0, 0, 0, 0);
     return date.getTime() === today.getTime();
+  };
+
+  // True if the booking's slot (date + end_time) has passed
+  const isSlotEnded = (booking) => {
+    if (!booking?.date || !booking?.end_time) return false;
+    const endStr = (booking.end_time || "").slice(0, 5);
+    const endAt = new Date(booking.date + "T" + endStr);
+    return endAt <= new Date();
+  };
+
+  const getBookingDisplayStatus = (booking) => {
+    if (booking.status === "cancelled") return { label: "Cancelled", bg: "#fee2e2", color: "#b91c1c" };
+    if (booking.started_at && booking.status === "confirmed") {
+      if (isSlotEnded(booking)) return { label: "Completed", bg: "#f3f4f6", color: "#6b7280" };
+      return { label: "Playing", bg: "#dbeafe", color: "#1d4ed8" };
+    }
+    if (booking.status === "confirmed") return { label: "Confirmed", bg: "#dcfce7", color: "#166534" };
+    return { label: booking.status, bg: "#f3f4f6", color: "#6b7280" };
   };
 
   const groupBookingsByDate = (bookingsList) => {
@@ -335,6 +424,301 @@ export default function OwnerBookings() {
     }
 
     return days;
+  };
+
+  // Schedule Grid View: group by court, fixed time slots, date picker
+  const ScheduleGridView = () => {
+    const scheduleDateStr = scheduleDate;
+    const courtsToShow =
+      courtFilter === "all" ? courts : courts.filter((c) => c.id === parseInt(courtFilter, 10));
+    const bookingsForDate = bookings; // API already returns bookings for scheduleDate in schedule mode
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        {/* Date control */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "1rem",
+            padding: "1rem 1.25rem",
+            backgroundColor: "#ffffff",
+            borderRadius: "0.75rem",
+            border: "1px solid #e5e7eb",
+          }}
+        >
+          <label
+            style={{
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              color: "#374151",
+            }}
+          >
+            Date
+          </label>
+          <input
+            type="date"
+            value={scheduleDateStr}
+            onChange={(e) => setScheduleDate(e.target.value)}
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #d1d5db",
+              borderRadius: "0.375rem",
+              fontSize: "0.9rem",
+            }}
+          />
+          <button
+            onClick={() => setScheduleDate(new Date().toISOString().slice(0, 10))}
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "#2563eb",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "0.375rem",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+            }}
+          >
+            Today
+          </button>
+          <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+            {formatDate(scheduleDateStr)}
+          </span>
+        </div>
+
+        {/* One section per court */}
+        {courtsToShow.map((court) => {
+          const slots = getSlotsForCourtOnDate(court.id, scheduleDateStr);
+          const courtBookings = bookingsForDate.filter((b) => b.court?.id === court.id);
+          const isExpanded = !collapsedScheduleCourts.has(court.id);
+          const toggleCourt = () => {
+            setCollapsedScheduleCourts((prev) => {
+              const next = new Set(prev);
+              if (next.has(court.id)) next.delete(court.id);
+              else next.add(court.id);
+              return next;
+            });
+          };
+
+          return (
+            <div
+              key={court.id}
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: "0.75rem",
+                border: "1px solid #e5e7eb",
+                overflow: "hidden",
+              }}
+            >
+              <button
+                type="button"
+                onClick={toggleCourt}
+                style={{
+                  width: "100%",
+                  margin: 0,
+                  padding: isMobile ? "1rem" : "1.25rem 1.5rem",
+                  fontSize: isMobile ? "1.1rem" : "1.25rem",
+                  fontWeight: 600,
+                  color: "#111827",
+                  border: "none",
+                  borderBottom: "1px solid #e5e7eb",
+                  backgroundColor: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  textAlign: "left",
+                }}
+              >
+                <span>{court.name}</span>
+                <span
+                  style={{
+                    fontSize: "1rem",
+                    color: "#6b7280",
+                    transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  ▼
+                </span>
+              </button>
+              {isExpanded && (
+              <>
+              {slots.length === 0 ? (
+                <p
+                  style={{
+                    padding: "1.5rem",
+                    color: "#6b7280",
+                    fontSize: "0.9rem",
+                    margin: 0,
+                  }}
+                >
+                  No availability set for this day. Set schedule in Court Schedule.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      tableLayout: "fixed",
+                      borderCollapse: "collapse",
+                      minWidth: "320px",
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ backgroundColor: "#f9fafb" }}>
+                        <th
+                          style={{
+                            padding: isMobile ? "0.75rem" : "1rem",
+                            textAlign: "left",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                            color: "#374151",
+                            width: "28%",
+                            minWidth: "140px",
+                          }}
+                        >
+                          Time
+                        </th>
+                        <th
+                          style={{
+                            padding: isMobile ? "0.75rem" : "1rem",
+                            textAlign: "left",
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                            color: "#374151",
+                            width: "72%",
+                          }}
+                        >
+                        
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {slots.map((slot) => {
+                        const booking = getBookingForSlot(slot, courtBookings);
+                        return (
+                          <tr
+                            key={`${slot.start}-${slot.end}`}
+                            style={{
+                              borderBottom: "1px solid #e5e7eb",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: isMobile ? "0.75rem" : "1rem",
+                                fontSize: "0.9rem",
+                                color: "#374151",
+                                verticalAlign: "top",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {formatTime12(slot.start)} – {formatTime12(slot.end)}
+                            </td>
+                            <td
+                              style={{
+                                padding: isMobile ? "0.75rem" : "1rem",
+                                verticalAlign: "top",
+                                width: "72%",
+                              }}
+                            >
+                              {booking ? (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setScheduleBookingModal({ booking, slot, shuttlecockCount: booking.shuttlecock_count ?? "" })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      setScheduleBookingModal({ booking, slot, shuttlecockCount: booking.shuttlecock_count ?? "" });
+                                    }
+                                  }}
+                                  style={{
+                                    padding: "0.75rem 1rem",
+                                    backgroundColor: booking.status === "cancelled" ? "#fef2f2" : "#f0fdf4",
+                                    border: `1px solid ${booking.status === "cancelled" ? "#fecaca" : "#bbf7d0"}`,
+                                    borderRadius: "0.5rem",
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.25rem" }}>
+                                    {booking.user?.name || "Guest"}
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "0.5rem",
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    {(() => {
+                                      const statusStyle = getBookingDisplayStatus(booking);
+                                      return (
+                                        <span
+                                          style={{
+                                            padding: "0.2rem 0.5rem",
+                                            borderRadius: "999px",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 500,
+                                            backgroundColor: statusStyle.bg,
+                                            color: statusStyle.color,
+                                          }}
+                                        >
+                                          {statusStyle.label}
+                                        </span>
+                                      );
+                                    })()}
+                                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                                      {booking.payment_status === "paid" ? "Paid full" : "Reserved"}
+                                    </span>
+                                    {isUpcoming(booking) && booking.status !== "cancelled" && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCancel(booking.id);
+                                        }}
+                                        disabled={cancellingId === booking.id}
+                                        style={{
+                                          padding: "0.2rem 0.5rem",
+                                          backgroundColor: "#fee2e2",
+                                          color: "#991b1b",
+                                          border: "1px solid #fecaca",
+                                          borderRadius: "0.25rem",
+                                          cursor: cancellingId === booking.id ? "not-allowed" : "pointer",
+                                          fontSize: "0.75rem",
+                                          opacity: cancellingId === booking.id ? 0.6 : 1,
+                                        }}
+                                        title="Cancel booking"
+                                      >
+                                        {cancellingId === booking.id ? "..." : "Cancel"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: "0.85rem", color: "#9ca3af" }}>Available</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   // Grouped by Date View Component
@@ -950,6 +1334,7 @@ export default function OwnerBookings() {
           View:
         </span>
         {[
+          { key: "schedule", label: "📋 Schedule", desc: "By court & time" },
           { key: "grouped", label: "📅 Group by Date", desc: "Expandable date cards" },
           { key: "calendar", label: "📆 Calendar", desc: "Monthly overview" },
         ].map((view) => (
@@ -1148,6 +1533,22 @@ export default function OwnerBookings() {
         <div style={{ textAlign: "center", padding: "3rem", color: "#6b7280" }}>
           Loading bookings...
         </div>
+      ) : viewMode === "schedule" && courts.length === 0 ? (
+        <div
+          style={{
+            padding: "3rem",
+            backgroundColor: "#ffffff",
+            borderRadius: "0.75rem",
+            border: "1px solid #e5e7eb",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ color: "#6b7280", marginBottom: "1rem", fontSize: "1.1rem" }}>
+            No courts yet. Add courts and set their schedules to see the schedule grid.
+          </p>
+        </div>
+      ) : viewMode === "schedule" ? (
+        <ScheduleGridView />
       ) : filteredBookings.length === 0 ? (
         <div
           style={{
@@ -1179,7 +1580,192 @@ export default function OwnerBookings() {
         </>
       )}
 
-      {/* Booking Detail Modal */}
+      {/* Schedule grid: booking detail modal (shuttlecock, start session) */}
+      {scheduleBookingModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1001,
+            padding: isMobile ? "0.5rem" : "1rem",
+          }}
+          onClick={() => setScheduleBookingModal(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "0.75rem",
+              padding: isMobile ? "1rem" : "1.5rem",
+              maxWidth: "420px",
+              width: "100%",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h2 style={{ fontSize: isMobile ? "1.2rem" : "1.35rem", fontWeight: 600, color: "#111827", margin: 0 }}>
+                Booking details
+              </h2>
+              <button
+                type="button"
+                onClick={() => setScheduleBookingModal(null)}
+                style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#6b7280" }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.25rem" }}>
+                {scheduleBookingModal.booking.user?.name || "Guest"}
+              </div>
+              <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: "0.25rem" }}>
+                {scheduleBookingModal.booking.court?.name} · {formatTime12(scheduleBookingModal.slot.start)} – {formatTime12(scheduleBookingModal.slot.end)}
+              </div>
+              {(() => {
+                const statusStyle = getBookingDisplayStatus(scheduleBookingModal.booking);
+                return (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "0.2rem 0.5rem",
+                      borderRadius: "999px",
+                      fontSize: "0.75rem",
+                      fontWeight: 500,
+                      backgroundColor: statusStyle.bg,
+                      color: statusStyle.color,
+                    }}
+                  >
+                    {statusStyle.label}
+                  </span>
+                );
+              })()}
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                Payment
+              </label>
+              {scheduleBookingModal.booking.payment_status === "paid" ? (
+                <span style={{ fontSize: "0.9rem", color: "#166534", fontWeight: 500 }}>Paid full</span>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>Reservation</span>
+                  <button
+                    type="button"
+                    disabled={markingPaidId === scheduleBookingModal.booking.id}
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          "You are confirming that the player is fully paid. Do you want to continue?"
+                        )
+                      ) {
+                        return;
+                      }
+                      const id = scheduleBookingModal.booking.id;
+                      setMarkingPaidId(id);
+                      try {
+                        const res = await api.patch(`/owner/bookings/${id}`, { payment_status: "paid" });
+                        setScheduleBookingModal((prev) =>
+                          prev ? { ...prev, booking: { ...prev.booking, payment_status: "paid" } } : null
+                        );
+                        loadBookings();
+                      } catch (err) {
+                        console.error(err);
+                        alert(err?.response?.data?.message || "Failed to update payment. Please try again.");
+                      } finally {
+                        setMarkingPaidId(null);
+                      }
+                    }}
+                    style={{
+                      padding: "0.4rem 0.75rem",
+                      backgroundColor: markingPaidId === scheduleBookingModal.booking.id ? "#9ca3af" : "#16a34a",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      cursor: markingPaidId === scheduleBookingModal.booking.id ? "not-allowed" : "pointer",
+                      opacity: markingPaidId === scheduleBookingModal.booking.id ? 0.8 : 1,
+                    }}
+                  >
+                    {markingPaidId === scheduleBookingModal.booking.id ? "Updating…" : "Is payment settled?"}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                Shuttlecock count
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={scheduleBookingModal.shuttlecockCount}
+                onChange={(e) =>
+                  setScheduleBookingModal((prev) => (prev ? { ...prev, shuttlecockCount: e.target.value } : null))
+                }
+                placeholder="e.g. 2"
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0.75rem",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.9rem",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            {scheduleBookingModal.booking.status === "confirmed" && !scheduleBookingModal.booking.started_at && (
+              <button
+                type="button"
+                disabled={startingSessionId === scheduleBookingModal.booking.id}
+                onClick={async () => {
+                  const id = scheduleBookingModal.booking.id;
+                  const raw = scheduleBookingModal.shuttlecockCount;
+                  const parsed = raw === "" ? NaN : parseInt(raw, 10);
+                  const shuttlecockCount = Number.isNaN(parsed) || parsed < 0 ? null : parsed;
+                  setStartingSessionId(id);
+                  try {
+                    await api.patch(`/owner/bookings/${id}`, {
+                      shuttlecock_count: shuttlecockCount,
+                      start_session: true,
+                    });
+                    setScheduleBookingModal(null);
+                    loadBookings();
+                  } catch (err) {
+                    console.error(err);
+                    alert(err?.response?.data?.message || "Failed to start session. Please try again.");
+                  } finally {
+                    setStartingSessionId(null);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem 1rem",
+                  backgroundColor: startingSessionId === scheduleBookingModal.booking.id ? "#9ca3af" : "#16a34a",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  cursor: startingSessionId === scheduleBookingModal.booking.id ? "not-allowed" : "pointer",
+                  opacity: startingSessionId === scheduleBookingModal.booking.id ? 0.8 : 1,
+                }}
+              >
+                {startingSessionId === scheduleBookingModal.booking.id ? "Starting…" : "Start session"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Booking Detail Modal (calendar / list view) */}
       {selectedBooking && (
         <div
           style={{

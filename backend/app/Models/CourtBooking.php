@@ -12,7 +12,14 @@ class CourtBooking extends Model
         'date',
         'start_time',
         'end_time',
-        'status'
+        'status',
+        'shuttlecock_count',
+        'started_at',
+        'payment_status',
+    ];
+
+    protected $casts = [
+        'started_at' => 'datetime',
     ];
 
     public function court()
