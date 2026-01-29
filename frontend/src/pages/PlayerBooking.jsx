@@ -63,7 +63,7 @@ export default function PlayerBooking() {
     api
       .get(`/player/courts?date=${date}`)
       .then((res) => {
-        setCourts(res.data || []);
+        setCourts(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
       })
       .catch((err) => {
         console.error(err);
@@ -170,7 +170,7 @@ export default function PlayerBooking() {
       // Refresh slots so newly booked slots become unavailable
       try {
         const res = await api.get(`/player/courts?date=${date}`);
-        setCourts(res.data || []);
+        setCourts(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
       } catch (refreshErr) {
         console.error("Failed to refresh courts after booking", refreshErr);
       }

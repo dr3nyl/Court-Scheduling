@@ -35,7 +35,7 @@ export default function OwnerCourts() {
     try {
       setLoading(true);
       const res = await api.get("/courts");
-      setCourts(res.data);
+      setCourts(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
     } catch (err) {
       console.error(err);
       setError("Failed to load courts");
@@ -59,7 +59,8 @@ export default function OwnerCourts() {
         reservation_fee_percentage: reservationFeePercentage ? parseFloat(reservationFeePercentage) : 0,
       };
       const res = await api.post("/courts", payload);
-      setCourts([...courts, res.data]);
+      const newCourt = res.data?.data ?? res.data;
+      setCourts([...courts, newCourt]);
       setName("");
       setHourlyRate("");
       setReservationFeePercentage("");
@@ -102,7 +103,8 @@ export default function OwnerCourts() {
         hourly_rate: editHourlyRate ? parseFloat(editHourlyRate) : null,
         reservation_fee_percentage: editReservationFeePercentage ? parseFloat(editReservationFeePercentage) : 0,
       });
-      setCourts(courts.map((c) => (c.id === courtId ? res.data : c)));
+      const updatedCourt = res.data?.data ?? res.data;
+      setCourts(courts.map((c) => (c.id === courtId ? updatedCourt : c)));
       setEditingId(null);
       setSuccess("Court updated successfully!");
       setTimeout(() => setSuccess(""), 3000);

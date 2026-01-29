@@ -50,7 +50,8 @@ export default function PlayerBookings() {
       setLoading(true);
       setError("");
       const res = await api.get("/player/bookings");
-      setBookings(res.data || []);
+      // API Resources wrap in { data: [...] }
+      setBookings(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
     } catch (err) {
       console.error(err);
       setError("Failed to load bookings. Please try again.");

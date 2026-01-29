@@ -46,7 +46,8 @@ export default function OwnerDashboard() {
       ]);
 
       setStats(statsRes.data);
-      setTodayBookings(bookingsRes.data.slice(0, 5)); // Show first 5 today bookings
+      const bookingsList = Array.isArray(bookingsRes.data) ? bookingsRes.data : (bookingsRes.data?.data ?? []);
+      setTodayBookings(bookingsList.slice(0, 5)); // Show first 5 today bookings
     } catch (err) {
       console.error(err);
       setError("Failed to load dashboard data");

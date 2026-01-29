@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreCourtAvailabilityRequest;
+use App\Http\Requests\UpdateCourtAvailabilityRequest;
 use App\Models\Court;
 use App\Models\CourtAvailability;
-use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CourtAvailabilityController extends Controller
@@ -18,25 +19,21 @@ class CourtAvailabilityController extends Controller
         return $court->availabilities()->orderBy('day_of_week')->get();
     }
 
-    public function store(Request $request, Court $court)
+    public function store(StoreCourtAvailabilityRequest $request, Court $court)
     {
         $this->authorize('manage-court', $court);
 
-        $request->validate([
-            'day_of_week' => 'required|integer|min:0|max:6',
-            'open_time' => 'required',
-            'close_time' => 'required|after:open_time'
-        ]);
-
-        return CourtAvailability::create([
+        $availability = CourtAvailability::create([
             'court_id' => $court->id,
             'day_of_week' => $request->day_of_week,
             'open_time' => $request->open_time,
             'close_time' => $request->close_time,
         ]);
+
+        return $availability;
     }
 
-    public function update(Request $request, Court $court, CourtAvailability $availability)
+    public function update(UpdateCourtAvailabilityRequest $request, Court $court, CourtAvailability $availability)
     {
         $this->authorize('manage-court', $court);
 

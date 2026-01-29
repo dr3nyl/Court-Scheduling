@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\CourtClosedException;
+use App\Exceptions\TimeSlotUnavailableException;
+use App\Http\Requests\CreateBookingRequest;
+use App\Http\Resources\CourtBookingResource;
 use App\Models\Court;
 use App\Models\CourtAvailability;
 use App\Models\CourtBooking;
@@ -33,7 +37,8 @@ class CourtBookingController extends Controller
                   ->where('status', 'confirmed');
         }
 
-        return $query->get();
+        $bookings = $query->get();
+        return CourtBookingResource::collection($bookings);
     }
 
     /**
@@ -68,7 +73,8 @@ class CourtBookingController extends Controller
                   ->where('status', 'confirmed');
         }
 
-        return $query->get();
+        $bookings = $query->get();
+        return CourtBookingResource::collection($bookings);
     }
 
     /**
@@ -137,23 +143,19 @@ class CourtBookingController extends Controller
             $query->where('date', $request->date);
         }
 
-        return $query
+        $bookings = $query
             ->orderBy('date')
             ->orderBy('start_time')
             ->get();
+
+        return CourtBookingResource::collection($bookings);
     }
 
     /**
      * Store a new booking
      */
-    public function store(Request $request, Court $court)
+    public function store(CreateBookingRequest $request, Court $court)
     {
-        $request->validate([
-            'date' => 'required|date',
-            'start_time' => 'required',
-            'end_time' => 'required|after:start_time',
-        ]);
-
         // 1️⃣ Check weekly availability
         $dayOfWeek = Carbon::parse($request->date)->dayOfWeek;
 
@@ -164,9 +166,7 @@ class CourtBookingController extends Controller
             ->exists();
 
         if (! $availabilityExists) {
-            return response()->json([
-                'message' => 'Court is closed during this time.'
-            ], 422);
+            throw new CourtClosedException('Court is closed during this time.');
         }
 
         // 2️⃣ Check overlapping bookings
@@ -174,15 +174,24 @@ class CourtBookingController extends Controller
             ->where('date', $request->date)
             ->where('status', 'confirmed')
             ->where(function ($q) use ($request) {
-                $q->where('start_time', '<=', $request->start_time)
-                    ->where('end_time', '>=', $request->end_time);
+                $q->where(function ($query) use ($request) {
+                    // New booking starts during existing booking
+                    $query->where('start_time', '<=', $request->start_time)
+                          ->where('end_time', '>', $request->start_time);
+                })->orWhere(function ($query) use ($request) {
+                    // New booking ends during existing booking
+                    $query->where('start_time', '<', $request->end_time)
+                          ->where('end_time', '>=', $request->end_time);
+                })->orWhere(function ($query) use ($request) {
+                    // New booking completely contains existing booking
+                    $query->where('start_time', '>=', $request->start_time)
+                          ->where('end_time', '<=', $request->end_time);
+                });
             })
             ->exists();
 
         if ($hasOverlap) {
-            return response()->json([
-                'message' => 'Time slot already booked.'
-            ], 422);
+            throw new TimeSlotUnavailableException('Time slot is already booked.');
         }
 
         // 3️⃣ Create booking
@@ -195,7 +204,7 @@ class CourtBookingController extends Controller
             'status' => 'confirmed',
         ]);
 
-        return response()->json($booking, 201);
+        return new CourtBookingResource($booking->load('court', 'user'));
     }
 
     /**
@@ -216,7 +225,7 @@ class CourtBookingController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Booking cancelled'
+            'message' => 'Booking cancelled successfully'
         ]);
     }
 }

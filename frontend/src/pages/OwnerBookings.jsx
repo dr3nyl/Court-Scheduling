@@ -50,7 +50,8 @@ export default function OwnerBookings() {
       }
 
       const res = await api.get(url);
-      setBookings(res.data || []);
+      // API Resources wrap in { data: [...] }
+      setBookings(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
     } catch (err) {
       console.error(err);
       setError("Failed to load bookings. Please try again.");
@@ -62,7 +63,7 @@ export default function OwnerBookings() {
   const loadCourts = useCallback(async () => {
     try {
       const res = await api.get("/courts");
-      setCourts(res.data || []);
+      setCourts(Array.isArray(res.data) ? res.data : (res.data?.data ?? []));
     } catch (err) {
       console.error(err);
     }

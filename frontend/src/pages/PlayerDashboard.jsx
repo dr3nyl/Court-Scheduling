@@ -32,13 +32,13 @@ export default function PlayerDashboard() {
     try {
       setLoading(true);
       const res = await api.get("/player/bookings?upcoming=true");
-      const bookings = res.data || [];
+      const bookings = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
       
       setUpcomingBookings(bookings.slice(0, 5)); // Show next 5 bookings
       
       // Calculate stats
       const allRes = await api.get("/player/bookings");
-      const allBookings = allRes.data || [];
+      const allBookings = Array.isArray(allRes.data) ? allRes.data : (allRes.data?.data ?? []);
       const today = new Date();
       const thisMonth = today.getMonth();
       const thisYear = today.getFullYear();
