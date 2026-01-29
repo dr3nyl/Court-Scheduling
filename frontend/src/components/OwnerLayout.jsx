@@ -153,6 +153,18 @@ export default function OwnerLayout({ children }) {
             >
               All Bookings
             </Link>
+            <Link
+              to="/owner/analytics"
+              style={{
+                color: "#374151",
+                textDecoration: "none",
+                fontWeight: 500,
+                fontSize: "0.95rem",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Analytics
+            </Link>
 
             {/* User Menu */}
             <div
@@ -251,6 +263,23 @@ export default function OwnerLayout({ children }) {
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               >
                 All Bookings
+              </Link>
+              <Link
+                to="/owner/analytics"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: "#374151",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.375rem",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                Analytics
               </Link>
               <div
                 style={{

@@ -12,6 +12,9 @@ export default function OwnerDashboard() {
     active_courts: 0,
     total_bookings: 0,
     today_bookings: 0,
+    today_revenue: 0,
+    today_games_played: 0,
+    today_cancelled: 0,
     this_week_bookings: 0,
     this_month_bookings: 0,
     upcoming_bookings: 0,
@@ -60,6 +63,10 @@ export default function OwnerDashboard() {
     return timeString.slice(0, 5);
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(amount ?? 0);
+  };
+
   return (
     <OwnerLayout>
       {/* Page Header */}
@@ -70,6 +77,66 @@ export default function OwnerDashboard() {
         <p style={{ color: "#6b7280", fontSize: isMobile ? "0.9rem" : "1rem" }}>
           Manage your courts and track bookings
         </p>
+      </div>
+
+      {/* Today's Summary */}
+      <div style={{ marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
+          Today&apos;s Summary
+        </h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: "1rem",
+          }}
+        >
+          <div
+            style={{
+              padding: isMobile ? "1rem" : "1.25rem",
+              backgroundColor: "#ecfdf5",
+              borderRadius: "0.75rem",
+              border: "1px solid #a7f3d0",
+            }}
+          >
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#065f46", marginBottom: "0.5rem" }}>
+              Revenue
+            </div>
+            <div style={{ fontSize: isMobile ? "1.25rem" : "1.5rem", fontWeight: "bold", color: "#047857" }}>
+              {loading ? "..." : formatCurrency(stats.today_revenue)}
+            </div>
+          </div>
+          <div
+            style={{
+              padding: isMobile ? "1rem" : "1.25rem",
+              backgroundColor: "#eff6ff",
+              borderRadius: "0.75rem",
+              border: "1px solid #bfdbfe",
+            }}
+          >
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#1e40af", marginBottom: "0.5rem" }}>
+              Games Played
+            </div>
+            <div style={{ fontSize: isMobile ? "1.25rem" : "1.5rem", fontWeight: "bold", color: "#2563eb" }}>
+              {loading ? "..." : stats.today_games_played}
+            </div>
+          </div>
+          <div
+            style={{
+              padding: isMobile ? "1rem" : "1.25rem",
+              backgroundColor: "#fef2f2",
+              borderRadius: "0.75rem",
+              border: "1px solid #fecaca",
+            }}
+          >
+            <div style={{ fontSize: isMobile ? "0.75rem" : "0.875rem", color: "#991b1b", marginBottom: "0.5rem" }}>
+              Cancelled
+            </div>
+            <div style={{ fontSize: isMobile ? "1.25rem" : "1.5rem", fontWeight: "bold", color: "#dc2626" }}>
+              {loading ? "..." : stats.today_cancelled}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions */}

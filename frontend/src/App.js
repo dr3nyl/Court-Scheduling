@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import OwnerCourts from "./pages/OwnerCourts";
 import OwnerCourtSchedule from "./pages/OwnerCourtSchedule";
 import OwnerBookings from "./pages/OwnerBookings";
+import OwnerAnalytics from "./pages/OwnerAnalytics";
 import PlayerBooking from "./pages/PlayerBooking";
 import PlayerBookings from "./pages/PlayerBookings";
 
@@ -79,6 +80,15 @@ function App() {
           element={
             <ProtectedRoute role="owner">
               <OwnerBookings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/owner/analytics"
+          element={
+            <ProtectedRoute role="owner">
+              <OwnerAnalytics />
             </ProtectedRoute>
           }
         />

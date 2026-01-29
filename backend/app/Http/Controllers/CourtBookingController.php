@@ -9,6 +9,7 @@ use App\Http\Resources\CourtBookingResource;
 use App\Models\Court;
 use App\Models\CourtAvailability;
 use App\Models\CourtBooking;
+use App\Models\QueueMatch;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -119,12 +120,37 @@ class CourtBookingController extends Controller
             ->where('date', '>=', $today)
             ->where('status', 'confirmed')
             ->count();
+
+        // Today's summary: revenue, games played, cancelled
+        $todayRevenue = 0;
+        $todayBookingsWithCourt = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', $today)
+            ->where('status', 'confirmed')
+            ->with('court:id,hourly_rate')
+            ->get();
+        foreach ($todayBookingsWithCourt as $b) {
+            $start = Carbon::parse($b->date . ' ' . $b->start_time);
+            $end = Carbon::parse($b->date . ' ' . $b->end_time);
+            $todayRevenue += ($start->diffInMinutes($end) / 60) * ($b->court->hourly_rate ?? 0);
+        }
+        $todayQueueMatches = QueueMatch::whereIn('court_id', $courtIds)
+            ->whereDate('start_time', $today)
+            ->where('status', 'completed')
+            ->count();
+        $todayGamesPlayed = $todayBookings + $todayQueueMatches;
+        $todayCancelled = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', $today)
+            ->where('status', 'cancelled')
+            ->count();
         
         return response()->json([
             'total_courts' => $totalCourts,
             'active_courts' => $activeCourts,
             'total_bookings' => $totalBookings,
             'today_bookings' => $todayBookings,
+            'today_revenue' => round($todayRevenue, 2),
+            'today_games_played' => $todayGamesPlayed,
+            'today_cancelled' => $todayCancelled,
             'this_week_bookings' => $thisWeekBookings,
             'this_month_bookings' => $thisMonthBookings,
             'upcoming_bookings' => $upcomingBookings,
@@ -226,6 +252,157 @@ class CourtBookingController extends Controller
 
         return response()->json([
             'message' => 'Booking cancelled successfully'
+        ]);
+    }
+
+    /**
+     * Get daily analytics (revenue, games played, cancelled)
+     */
+    public function dailyAnalytics(Request $request)
+    {
+        $ownerId = Auth::id();
+        
+        // Get all court IDs owned by this user
+        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        
+        if ($courtIds->isEmpty()) {
+            return response()->json([
+                'data' => []
+            ]);
+        }
+
+        // Date range filter (default: last 30 days)
+        $startDate = $request->input('start_date', Carbon::now()->subDays(30)->toDateString());
+        $endDate = $request->input('end_date', Carbon::now()->toDateString());
+
+        // Get confirmed bookings with court info for revenue calculation
+        $bookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', '>=', $startDate)
+            ->where('date', '<=', $endDate)
+            ->with('court:id,hourly_rate')
+            ->get();
+
+        // Get queue matches for owner's courts
+        $queueMatches = QueueMatch::whereIn('court_id', $courtIds)
+            ->whereDate('start_time', '>=', $startDate)
+            ->whereDate('start_time', '<=', $endDate)
+            ->get();
+
+        // Group by date
+        $dailyStats = [];
+
+        // Process bookings
+        foreach ($bookings as $booking) {
+            $date = $booking->date;
+            
+            if (!isset($dailyStats[$date])) {
+                $dailyStats[$date] = [
+                    'date' => $date,
+                    'revenue' => 0,
+                    'games_played' => 0,
+                    'cancelled' => 0,
+                ];
+            }
+
+            if ($booking->status === 'confirmed') {
+                // Calculate revenue: duration in hours × hourly_rate
+                $start = Carbon::parse($booking->date . ' ' . $booking->start_time);
+                $end = Carbon::parse($booking->date . ' ' . $booking->end_time);
+                $hours = $start->diffInMinutes($end) / 60;
+                $revenue = $hours * ($booking->court->hourly_rate ?? 0);
+                
+                $dailyStats[$date]['revenue'] += $revenue;
+                $dailyStats[$date]['games_played'] += 1;
+            } elseif ($booking->status === 'cancelled') {
+                $dailyStats[$date]['cancelled'] += 1;
+            }
+        }
+
+        // Process queue matches (completed = games played)
+        foreach ($queueMatches as $match) {
+            $date = Carbon::parse($match->start_time)->toDateString();
+            
+            if (!isset($dailyStats[$date])) {
+                $dailyStats[$date] = [
+                    'date' => $date,
+                    'revenue' => 0,
+                    'games_played' => 0,
+                    'cancelled' => 0,
+                ];
+            }
+
+            if ($match->status === 'completed') {
+                $dailyStats[$date]['games_played'] += 1;
+            }
+        }
+
+        // Convert to array and sort by date (newest first)
+        $result = array_values($dailyStats);
+        usort($result, function ($a, $b) {
+            return strcmp($b['date'], $a['date']);
+        });
+
+        return response()->json([
+            'data' => $result
+        ]);
+    }
+
+    /**
+     * Export report as CSV (bookings in date range with revenue)
+     */
+    public function exportReport(Request $request)
+    {
+        $ownerId = Auth::id();
+        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+
+        if ($courtIds->isEmpty()) {
+            return response()->json(['data' => []], 200);
+        }
+
+        $startDate = $request->input('start_date', Carbon::now()->subDays(30)->toDateString());
+        $endDate = $request->input('end_date', Carbon::now()->toDateString());
+
+        $bookings = CourtBooking::whereIn('court_id', $courtIds)
+            ->where('date', '>=', $startDate)
+            ->where('date', '<=', $endDate)
+            ->with(['court:id,name,hourly_rate', 'user:id,name,email'])
+            ->orderBy('date')
+            ->orderBy('start_time')
+            ->get();
+
+        $lines = [
+            ['Date', 'Court', 'Customer', 'Email', 'Start', 'End', 'Status', 'Revenue (PHP)'],
+        ];
+
+        foreach ($bookings as $b) {
+            $start = Carbon::parse($b->date . ' ' . $b->start_time);
+            $end = Carbon::parse($b->date . ' ' . $b->end_time);
+            $hours = $start->diffInMinutes($end) / 60;
+            $revenue = $b->status === 'confirmed'
+                ? round($hours * ($b->court->hourly_rate ?? 0), 2)
+                : 0;
+            $lines[] = [
+                $b->date,
+                $b->court->name ?? '',
+                $b->user->name ?? '',
+                $b->user->email ?? '',
+                $b->start_time,
+                $b->end_time,
+                $b->status,
+                (string) $revenue,
+            ];
+        }
+
+        $csv = implode("\n", array_map(function ($row) {
+            return implode(',', array_map(function ($cell) {
+                return '"' . str_replace('"', '""', $cell) . '"';
+            }, $row));
+        }, $lines));
+
+        $filename = 'report_' . $startDate . '_' . $endDate . '.csv';
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
 }

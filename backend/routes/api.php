@@ -34,6 +34,8 @@ Route::middleware(['auth:sanctum', 'owner'])->group(function () {
     Route::patch('/courts/{court}', [CourtController::class, 'update']);
     Route::get('/owner/bookings', [CourtBookingController::class, 'ownerBookings']);
     Route::get('/owner/stats', [CourtBookingController::class, 'ownerStats']);
+    Route::get('/owner/analytics', [CourtBookingController::class, 'dailyAnalytics']);
+    Route::get('/owner/reports/export', [CourtBookingController::class, 'exportReport']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
