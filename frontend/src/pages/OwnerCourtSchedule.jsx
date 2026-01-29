@@ -36,8 +36,11 @@ export default function OwnerCourtSchedule() {
         api.get(`/owner/courts/${courtId}/availability`),
         api.get("/courts"),
       ]);
-      setSchedules(schedulesRes.data);
-      const foundCourt = courtsRes.data.find((c) => c.id.toString() === courtId);
+      // API Resources wrap in { data: [...] }
+      const schedulesList = Array.isArray(schedulesRes.data) ? schedulesRes.data : (schedulesRes.data?.data ?? []);
+      setSchedules(schedulesList);
+      const courtsList = Array.isArray(courtsRes.data) ? courtsRes.data : (courtsRes.data?.data ?? []);
+      const foundCourt = courtsList.find((c) => c.id.toString() === courtId);
       setCourt(foundCourt);
     } catch (err) {
       console.error(err);
@@ -77,7 +80,8 @@ export default function OwnerCourtSchedule() {
         close_time: closeTime,
       });
 
-      setSchedules([...schedules, res.data]);
+      const newSchedule = res.data?.data ?? res.data;
+      setSchedules([...schedules, newSchedule]);
       setDayOfWeek("");
       setOpenTime("");
       setCloseTime("");
@@ -120,7 +124,8 @@ export default function OwnerCourtSchedule() {
         close_time: editCloseTime,
       });
 
-      setSchedules(schedules.map((s) => (s.id === scheduleId ? res.data : s)));
+      const updatedSchedule = res.data?.data ?? res.data;
+      setSchedules(schedules.map((s) => (s.id === scheduleId ? updatedSchedule : s)));
       setEditingId(null);
       setSuccess("Schedule updated successfully!");
       setTimeout(() => setSuccess(""), 3000);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCourtAvailabilityRequest;
 use App\Http\Requests\UpdateCourtAvailabilityRequest;
+use App\Http\Resources\CourtAvailabilityResource;
 use App\Models\Court;
 use App\Models\CourtAvailability;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,7 +17,8 @@ class CourtAvailabilityController extends Controller
     {
         $this->authorize('manage-court', $court);
 
-        return $court->availabilities()->orderBy('day_of_week')->get();
+        $availabilities = $court->availabilities()->orderBy('day_of_week')->get();
+        return CourtAvailabilityResource::collection($availabilities);
     }
 
     public function store(StoreCourtAvailabilityRequest $request, Court $court)
@@ -30,7 +32,7 @@ class CourtAvailabilityController extends Controller
             'close_time' => $request->close_time,
         ]);
 
-        return $availability;
+        return new CourtAvailabilityResource($availability);
     }
 
     public function update(UpdateCourtAvailabilityRequest $request, Court $court, CourtAvailability $availability)
@@ -43,7 +45,7 @@ class CourtAvailabilityController extends Controller
 
         $availability->update($request->only(['open_time', 'close_time']));
 
-        return $availability;
+        return new CourtAvailabilityResource($availability);
     }
 
     public function destroy(Court $court, CourtAvailability $availability)
