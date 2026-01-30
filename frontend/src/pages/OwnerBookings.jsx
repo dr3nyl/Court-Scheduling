@@ -611,7 +611,7 @@ export default function OwnerBookings() {
                                 padding: isMobile ? "0.75rem" : "1rem",
                                 fontSize: "0.9rem",
                                 color: "#374151",
-                                verticalAlign: "top",
+                                verticalAlign: "middle",
                                 whiteSpace: "nowrap",
                               }}
                             >
@@ -620,7 +620,7 @@ export default function OwnerBookings() {
                             <td
                               style={{
                                 padding: isMobile ? "0.75rem" : "1rem",
-                                verticalAlign: "top",
+                                verticalAlign: "middle",
                                 width: "72%",
                               }}
                             >
