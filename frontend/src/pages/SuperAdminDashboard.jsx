@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 
 export default function SuperAdminDashboard() {
@@ -17,7 +17,7 @@ export default function SuperAdminDashboard() {
   const [createError, setCreateError] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
 
-  const fetchUsers = () => {
+  const fetchUsers = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
@@ -26,11 +26,11 @@ export default function SuperAdminDashboard() {
       .then((res) => setUsers(res.data.data || []))
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
-  };
+  }, [search, roleFilter]);
 
   useEffect(() => {
     fetchUsers();
-  }, [search, roleFilter]);
+  }, [fetchUsers]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

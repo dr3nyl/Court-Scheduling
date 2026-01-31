@@ -1722,7 +1722,7 @@ export default function OwnerBookings() {
                       const id = scheduleBookingModal.booking.id;
                       setMarkingPaidId(id);
                       try {
-                        const res = await api.patch(`/owner/bookings/${id}`, { payment_status: "paid" });
+                        await api.patch(`/owner/bookings/${id}`, { payment_status: "paid" });
                         setScheduleBookingModal((prev) =>
                           prev ? { ...prev, booking: { ...prev.booking, payment_status: "paid" } } : null
                         );
