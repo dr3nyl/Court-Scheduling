@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
 import PlayerLayout from "../components/PlayerLayout";
+import toast from "react-hot-toast";
 
 // Helper to get today's date in YYYY-MM-DD (for the date input)
 const todayString = () => new Date().toISOString().slice(0, 10);
@@ -163,6 +164,7 @@ export default function PlayerBooking() {
         `${slotCount} booking${slotCount > 1 ? "s" : ""} confirmed! You can view ${slotCount > 1 ? "them" : "it"} in My Bookings.`
       );
 
+      toast.success("Booking created successfully");
       // Clear selections and close modal
       setSelectedSlots([]);
       setSummaryModalOpen(false);
