@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import toast from "react-hot-toast";
 import api from "../services/api";
 import OwnerLayout from "../components/OwnerLayout";
+import EmptyState from "../components/EmptyState";
 
 export default function OwnerBookings() {
   const [bookings, setBookings] = useState([]);
@@ -131,11 +133,12 @@ export default function OwnerBookings() {
     try {
       setCancellingId(bookingId);
       await api.delete(`/bookings/${bookingId}`);
+      toast.success("Booking cancelled successfully");
       await loadBookings();
       setSelectedBooking(null);
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.message || "Failed to cancel booking");
+      toast.error(err?.response?.data?.message || "Failed to cancel booking");
     } finally {
       setCancellingId(null);
     }
@@ -1534,45 +1537,43 @@ export default function OwnerBookings() {
           Loading bookings...
         </div>
       ) : viewMode === "schedule" && courts.length === 0 ? (
-        <div
-          style={{
-            padding: "3rem",
-            backgroundColor: "#ffffff",
-            borderRadius: "0.75rem",
-            border: "1px solid #e5e7eb",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "#6b7280", marginBottom: "1rem", fontSize: "1.1rem" }}>
-            No courts yet. Add courts and set their schedules to see the schedule grid.
-          </p>
-        </div>
+        <EmptyState
+          title="No courts yet"
+          message="Add courts and set their schedules in My Courts to see the schedule grid here."
+          actionLabel="Go to My Courts"
+          actionTo="/owner/courts"
+        />
       ) : viewMode === "schedule" ? (
         <ScheduleGridView />
       ) : filteredBookings.length === 0 ? (
-        <div
-          style={{
-            padding: "3rem",
-            backgroundColor: "#ffffff",
-            borderRadius: "0.75rem",
-            border: "1px solid #e5e7eb",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "#6b7280", marginBottom: "1rem", fontSize: "1.1rem" }}>
-            {filter === "today"
-              ? "No bookings scheduled for today"
+        <EmptyState
+          title={
+            filter === "today"
+              ? "No bookings for today"
               : filter === "upcoming"
               ? "No upcoming bookings"
               : filter === "cancelled"
               ? "No cancelled bookings"
               : dateFilter
-              ? "No bookings found for the selected date"
+              ? "No bookings for this date"
               : courtFilter !== "all"
-              ? "No bookings found for this court"
-              : "No bookings yet"}
-          </p>
-        </div>
+              ? "No bookings for this court"
+              : "No bookings yet"
+          }
+          message={
+            filter === "today"
+              ? "Bookings for today will appear here once players book."
+              : filter === "upcoming"
+              ? "Upcoming bookings will show here."
+              : filter === "cancelled"
+              ? "Cancelled bookings will appear here."
+              : dateFilter
+              ? "Try another date or view All."
+              : courtFilter !== "all"
+              ? "Try another court or view All."
+              : "Bookings will appear here once players reserve courts."
+          }
+        />
       ) : (
         <>
           {viewMode === "grouped" && <GroupedByDateView />}
@@ -1677,7 +1678,7 @@ export default function OwnerBookings() {
                         loadBookings();
                       } catch (err) {
                         console.error(err);
-                        alert(err?.response?.data?.message || "Failed to update payment. Please try again.");
+                        toast.error(err?.response?.data?.message || "Failed to update payment. Please try again.");
                       } finally {
                         setMarkingPaidId(null);
                       }
@@ -1740,7 +1741,7 @@ export default function OwnerBookings() {
                     loadBookings();
                   } catch (err) {
                     console.error(err);
-                    alert(err?.response?.data?.message || "Failed to start session. Please try again.");
+                    toast.error(err?.response?.data?.message || "Failed to start session. Please try again.");
                   } finally {
                     setStartingSessionId(null);
                   }

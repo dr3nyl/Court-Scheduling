@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import api from "../services/api";
 import PlayerLayout from "../components/PlayerLayout";
+import EmptyState from "../components/EmptyState";
 
 export default function PlayerBookings() {
   const [bookings, setBookings] = useState([]);
@@ -68,10 +70,11 @@ export default function PlayerBookings() {
     try {
       setCancellingId(bookingId);
       await api.delete(`/bookings/${bookingId}`);
+      toast.success("Booking cancelled successfully");
       await loadBookings(); // Refresh the list
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.message || "Failed to cancel booking");
+      toast.error(err?.response?.data?.message || "Failed to cancel booking");
     } finally {
       setCancellingId(null);
     }
@@ -413,43 +416,32 @@ export default function PlayerBookings() {
           Loading bookings...
         </div>
       ) : groupedBookings.length === 0 ? (
-        <div
-          style={{
-            padding: "3rem",
-            backgroundColor: "#ffffff",
-            borderRadius: "0.75rem",
-            border: "1px solid #e5e7eb",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "#6b7280", marginBottom: "1rem", fontSize: "1.1rem" }}>
-            {dateSearch
-              ? "No bookings found for this date"
+        <EmptyState
+          title={
+            dateSearch
+              ? "No bookings for this date"
               : filter === "upcoming"
               ? "No upcoming bookings"
               : filter === "past"
               ? "No past bookings"
               : filter === "cancelled"
               ? "No cancelled bookings"
-              : "No bookings yet"}
-          </p>
-          {filter === "upcoming" && (
-            <Link
-              to="/player/book"
-              style={{
-                display: "inline-block",
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                borderRadius: "0.5rem",
-                textDecoration: "none",
-                fontWeight: 500,
-              }}
-            >
-              Book a Court
-            </Link>
-          )}
-        </div>
+              : "No bookings yet"
+          }
+          message={
+            dateSearch
+              ? "Try a different date or clear the search."
+              : filter === "upcoming"
+              ? "Book a court to see your upcoming bookings here."
+              : filter === "past"
+              ? "Past bookings will appear here."
+              : filter === "cancelled"
+              ? "Cancelled bookings will appear here."
+              : "Your bookings will show here once you book a court."
+          }
+          actionLabel={(filter === "upcoming" || filter === "all") && !dateSearch ? "Book a Court" : undefined}
+          actionTo={(filter === "upcoming" || filter === "all") && !dateSearch ? "/player/book" : undefined}
+        />
       ) : (
         <div
           style={{

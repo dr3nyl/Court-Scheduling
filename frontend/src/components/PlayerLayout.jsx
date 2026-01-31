@@ -116,6 +116,20 @@ export default function PlayerLayout({ children }) {
               flexWrap: "wrap",
             }}
           >
+            {user?.role === "superadmin" && (
+              <Link
+                to="/admin"
+                style={{
+                  color: "#7c3aed",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ← Admin
+              </Link>
+            )}
             <Link
               to="/player"
               style={{
@@ -151,6 +165,18 @@ export default function PlayerLayout({ children }) {
               }}
             >
               My Bookings
+            </Link>
+            <Link
+              to="/help"
+              style={{
+                color: "#374151",
+                textDecoration: "none",
+                fontWeight: 500,
+                fontSize: "0.95rem",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Help
             </Link>
 
             {/* User Menu */}
@@ -200,6 +226,24 @@ export default function PlayerLayout({ children }) {
                 marginTop: "1rem",
               }}
             >
+              {user?.role === "superadmin" && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    color: "#7c3aed",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    padding: "0.75rem",
+                    borderRadius: "0.375rem",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  ← Admin
+                </Link>
+              )}
               <Link
                 to="/player"
                 onClick={() => setMobileMenuOpen(false)}
@@ -250,6 +294,23 @@ export default function PlayerLayout({ children }) {
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               >
                 My Bookings
+              </Link>
+              <Link
+                to="/help"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: "#374151",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.375rem",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                Help
               </Link>
 
               <div

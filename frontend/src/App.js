@@ -2,11 +2,16 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Landing from "./pages/Landing";
+import Help from "./pages/Help";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import PlayerDashboard from "./pages/PlayerDashboard";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import QueueMasterDashboard from "./pages/QueueMasterDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import QueueSessionView from "./pages/QueueSessionView";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SuperAdminLayout from "./components/SuperAdminLayout";
 import OwnerCourts from "./pages/OwnerCourts";
 import OwnerCourtSchedule from "./pages/OwnerCourtSchedule";
 import OwnerBookings from "./pages/OwnerBookings";
@@ -21,6 +26,20 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/help" element={<Help />} />
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute role="superadmin">
+              <SuperAdminLayout>
+                <SuperAdminDashboard />
+              </SuperAdminLayout>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/player"

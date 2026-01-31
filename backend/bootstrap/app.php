@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'owner' => \App\Http\Middleware\EnsureOwner::class,
             'queue_master_or_owner' => \App\Http\Middleware\EnsureQueueMasterOrOwner::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
         
         // Configure CORS for API routes

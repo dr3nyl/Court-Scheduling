@@ -53,4 +53,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(QueueEntry::class, 'user_id');
     }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'superadmin';
+    }
 }

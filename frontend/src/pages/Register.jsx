@@ -14,7 +14,7 @@ export default function Register() {
     name: "",
     email: "",
     password: "",
-    role: "player", // default role
+    password_confirmation: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,13 +23,23 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.email || !form.password) {
+    if (!form.name || !form.email || !form.password || !form.password_confirmation) {
       setError("Please fill in all fields");
       return;
     }
 
-    if (form.password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters with letters and numbers");
+      return;
+    }
+
+    if (form.password !== form.password_confirmation) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(form.password) || !/\d/.test(form.password)) {
+      setError("Password must contain both letters and numbers");
       return;
     }
 
@@ -37,20 +47,17 @@ export default function Register() {
       setLoading(true);
       setError("");
 
-      // Call register API
-      await register(form);
+      await register({ name: form.name, email: form.email, password: form.password, password_confirmation: form.password_confirmation });
 
-      // Redirect based on role after successful registration
-      if (form.role === "player") {
-        navigate("/player");
-      } else if (form.role === "owner") {
-        navigate("/owner");
-      } else if (form.role === "queue_master") {
-        navigate("/queue-master");
-      }
+      navigate("/player");
     } catch (err) {
       console.error("Registration error:", err);
-      setError(err?.response?.data?.message || "Registration failed. Please try again.");
+      if (err?.response?.status === 429) {
+        setError("Too many attempts. Please try again in a minute.");
+      } else {
+        const msg = err?.response?.data?.message || err?.response?.data?.errors?.password?.[0] || "Registration failed. Please try again.";
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -211,14 +218,14 @@ export default function Register() {
             </label>
             <input
               type="password"
-              placeholder="Create a password (min. 6 characters)"
+              placeholder="Min. 8 characters, letters and numbers"
               value={form.password}
               onChange={(e) => {
                 setForm({ ...form, password: e.target.value });
                 setError("");
               }}
               required
-              minLength={6}
+              minLength={8}
               style={{
                 width: "100%",
                 padding: "0.75rem",
@@ -230,7 +237,7 @@ export default function Register() {
             />
           </div>
 
-          {/* Role selection */}
+          {/* Password confirmation */}
           <div style={{ marginBottom: "1.5rem" }}>
             <label
               style={{
@@ -241,29 +248,27 @@ export default function Register() {
                 marginBottom: "0.5rem",
               }}
             >
-              I am a...
+              Confirm Password
             </label>
-            <select
-              value={form.role}
+            <input
+              type="password"
+              placeholder="Confirm your password"
+              value={form.password_confirmation}
               onChange={(e) => {
-                setForm({ ...form, role: e.target.value });
+                setForm({ ...form, password_confirmation: e.target.value });
                 setError("");
               }}
+              required
+              minLength={8}
               style={{
                 width: "100%",
                 padding: "0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
                 fontSize: "0.95rem",
-                backgroundColor: "#ffffff",
-                cursor: "pointer",
                 boxSizing: "border-box",
               }}
-            >
-              <option value="player">Player</option>
-              <option value="owner">Court Owner</option>
-              <option value="queue_master">Queue Master</option>
-            </select>
+            />
           </div>
 
           {/* Submit button */}

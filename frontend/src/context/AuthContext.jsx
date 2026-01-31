@@ -71,11 +71,17 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout function
-    const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem("token");
+  // Logout function - revoke token on server
+  const logout = async () => {
+    try {
+      await api.post("/logout");
+    } catch {
+      // Ignore errors (e.g. token already invalid)
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem("token");
+    }
   };
   
   if (loading) return null;

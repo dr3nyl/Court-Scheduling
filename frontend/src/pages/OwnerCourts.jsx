@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { Link } from "react-router-dom";
 import OwnerLayout from "../components/OwnerLayout";
+import EmptyState from "../components/EmptyState";
 
 export default function OwnerCourts() {
   const [courts, setCourts] = useState([]);
@@ -327,22 +328,10 @@ export default function OwnerCourts() {
           Loading courts...
         </div>
       ) : courts.length === 0 ? (
-        <div
-          style={{
-            padding: "3rem",
-            backgroundColor: "#ffffff",
-            borderRadius: "0.75rem",
-            border: "1px solid #e5e7eb",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "#6b7280", marginBottom: "1rem", fontSize: "1.1rem" }}>
-            No courts yet
-          </p>
-          <p style={{ color: "#9ca3af", fontSize: "0.9rem" }}>
-            Create your first court to get started
-          </p>
-        </div>
+        <EmptyState
+          title="No courts yet"
+          message="Create your first court using the form above to get started."
+        />
       ) : (
         <div
           style={{

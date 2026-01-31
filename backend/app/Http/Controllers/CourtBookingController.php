@@ -47,10 +47,10 @@ class CourtBookingController extends Controller
      */
     public function ownerBookings(Request $request)
     {
-        $ownerId = Auth::id();
-        
-        // Get all court IDs owned by this user
-        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        $user = Auth::user();
+        $courtIds = $user->isSuperAdmin()
+            ? Court::pluck('id')
+            : Court::where('owner_id', $user->id)->pluck('id');
         
         $query = CourtBooking::whereIn('court_id', $courtIds)
             ->with(['court:id,name', 'user:id,name,email'])
@@ -84,7 +84,7 @@ class CourtBookingController extends Controller
     public function ownerUpdateBooking(Request $request, CourtBooking $booking)
     {
         $court = $booking->court;
-        if (!$court || $court->owner_id !== Auth::id()) {
+        if (!$court || (!Auth::user()->isSuperAdmin() && $court->owner_id !== Auth::id())) {
             abort(403, 'Unauthorized.');
         }
 
@@ -120,19 +120,19 @@ class CourtBookingController extends Controller
      */
     public function ownerStats(Request $request)
     {
-        $ownerId = Auth::id();
-        
-        // Get all court IDs owned by this user
-        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        $user = Auth::user();
+        $courtIds = $user->isSuperAdmin()
+            ? Court::pluck('id')
+            : Court::where('owner_id', $user->id)->pluck('id');
         
         $today = Carbon::today()->toDateString();
         $thisMonthStart = Carbon::now()->startOfMonth()->toDateString();
         $thisWeekStart = Carbon::now()->startOfWeek()->toDateString();
         
         $totalCourts = $courtIds->count();
-        $activeCourts = Court::where('owner_id', $ownerId)
-            ->where('is_active', true)
-            ->count();
+        $activeCourts = $user->isSuperAdmin()
+            ? Court::where('is_active', true)->count()
+            : Court::where('owner_id', $user->id)->where('is_active', true)->count();
         
         $totalBookings = CourtBooking::whereIn('court_id', $courtIds)
             ->where('status', 'confirmed')
@@ -276,11 +276,11 @@ class CourtBookingController extends Controller
      */
     public function destroy(CourtBooking $booking)
     {
-        // Only owner or booking owner can cancel
-        if (
-            Auth::id() !== $booking->user_id &&
-            Auth::id() !== $booking->court->owner_id
-        ) {
+        $user = Auth::user();
+        $canCancel = $user->isSuperAdmin()
+            || $user->id === $booking->user_id
+            || $user->id === $booking->court->owner_id;
+        if (!$canCancel) {
             abort(403);
         }
 
@@ -298,10 +298,10 @@ class CourtBookingController extends Controller
      */
     public function dailyAnalytics(Request $request)
     {
-        $ownerId = Auth::id();
-        
-        // Get all court IDs owned by this user
-        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        $user = Auth::user();
+        $courtIds = $user->isSuperAdmin()
+            ? Court::pluck('id')
+            : Court::where('owner_id', $user->id)->pluck('id');
         
         if ($courtIds->isEmpty()) {
             return response()->json([
@@ -390,8 +390,10 @@ class CourtBookingController extends Controller
      */
     public function exportReport(Request $request)
     {
-        $ownerId = Auth::id();
-        $courtIds = Court::where('owner_id', $ownerId)->pluck('id');
+        $user = Auth::user();
+        $courtIds = $user->isSuperAdmin()
+            ? Court::pluck('id')
+            : Court::where('owner_id', $user->id)->pluck('id');
 
         if ($courtIds->isEmpty()) {
             return response()->json(['data' => []], 200);

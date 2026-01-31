@@ -43,11 +43,30 @@ export default function QueueMasterLayout({ children }) {
             Queue Master
           </Link>
           <nav style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
+            {user?.role === "superadmin" && (
+              <Link
+                to="/admin"
+                style={{
+                  color: "#7c3aed",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                }}
+              >
+                ← Admin
+              </Link>
+            )}
             <Link
               to="/queue-master"
               style={{ color: "#374151", textDecoration: "none", fontWeight: 500, fontSize: "0.95rem" }}
             >
               Sessions
+            </Link>
+            <Link
+              to="/help"
+              style={{ color: "#374151", textDecoration: "none", fontWeight: 500, fontSize: "0.95rem" }}
+            >
+              Help
             </Link>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginLeft: "1rem", paddingLeft: "1rem", borderLeft: "1px solid #e5e7eb" }}>
               <span style={{ color: "#6b7280", fontSize: "0.9rem" }}>{user?.name}</span>

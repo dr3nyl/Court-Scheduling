@@ -15,7 +15,8 @@ class EnsureOwner
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user()->role !== 'owner') {
+        $role = $request->user()?->role;
+        if (! in_array($role, ['owner', 'superadmin'], true)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 

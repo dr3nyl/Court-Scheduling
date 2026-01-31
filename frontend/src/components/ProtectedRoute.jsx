@@ -10,7 +10,9 @@ export default function ProtectedRoute({ children, role }) {
   }
 
   if (role) {
-    const allowed = Array.isArray(role) ? role.includes(user.role) : user.role === role;
+    const allowed = Array.isArray(role)
+      ? role.includes(user.role) || user.role === "superadmin"
+      : user.role === role || user.role === "superadmin";
     if (!allowed) return <Navigate to="/login" />;
   }
 

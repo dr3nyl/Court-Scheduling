@@ -6,40 +6,39 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-
-    // REGISTER
+    /**
+     * Register - only players can self-register
+     */
     public function register(Request $request)
-    { 
-        // Validate request
+    {
         $request->validate([
-            'name' => 'required|string',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-            'role' => 'required|in:player,owner,queue_master',
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ]);
 
-        // Create user
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'role' => $request->role,
+            'role' => 'player',
             'password' => Hash::make($request->password),
         ]);
 
-        // Create Sanctum token
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Return response
         return response()->json([
             'user' => $user,
             'token' => $token,
         ]);
     }
 
-    // LOGIN
+    /**
+     * Login
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -47,22 +46,29 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        // Find user
         $user = User::where('email', $request->email)->first();
 
-        // Check credentials
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
         }
 
-        // Create token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'user' => $user,
             'token' => $token,
         ]);
+    }
+
+    /**
+     * Logout - revoke current token
+     */
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json(['message' => 'Logged out successfully']);
     }
 }

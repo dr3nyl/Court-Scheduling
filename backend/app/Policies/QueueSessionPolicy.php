@@ -12,7 +12,7 @@ class QueueSessionPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['owner', 'queue_master']);
+        return in_array($user->role, ['owner', 'queue_master', 'superadmin']);
     }
 
     /**
@@ -20,7 +20,7 @@ class QueueSessionPolicy
      */
     public function view(User $user, QueueSession $session): bool
     {
-        return $session->owner_id === $user->id || $user->role === 'queue_master';
+        return $user->isSuperAdmin() || $session->owner_id === $user->id || $user->role === 'queue_master';
     }
 
     /**
@@ -28,7 +28,7 @@ class QueueSessionPolicy
      */
     public function create(User $user): bool
     {
-        return in_array($user->role, ['owner', 'queue_master']);
+        return in_array($user->role, ['owner', 'queue_master', 'superadmin']);
     }
 
     /**
@@ -36,7 +36,7 @@ class QueueSessionPolicy
      */
     public function update(User $user, QueueSession $session): bool
     {
-        return $session->owner_id === $user->id || $user->role === 'queue_master';
+        return $user->isSuperAdmin() || $session->owner_id === $user->id || $user->role === 'queue_master';
     }
 
     /**
@@ -44,6 +44,6 @@ class QueueSessionPolicy
      */
     public function delete(User $user, QueueSession $session): bool
     {
-        return $session->owner_id === $user->id || $user->role === 'queue_master';
+        return $user->isSuperAdmin() || $session->owner_id === $user->id || $user->role === 'queue_master';
     }
 }

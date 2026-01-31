@@ -32,7 +32,9 @@ export default function Login() {
       const loggedInUser = await login(email, password);
 
       // Redirect based on role
-      if (loggedInUser.role === "player") {
+      if (loggedInUser.role === "superadmin") {
+        navigate("/admin");
+      } else if (loggedInUser.role === "player") {
         navigate("/player");
       } else if (loggedInUser.role === "owner") {
         navigate("/owner");
@@ -41,7 +43,11 @@ export default function Login() {
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError(err?.response?.data?.message || "Invalid email or password. Please try again.");
+      if (err?.response?.status === 429) {
+        setError("Too many attempts. Please try again in a minute.");
+      } else {
+        setError(err?.response?.data?.message || "Invalid email or password. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -217,10 +223,23 @@ export default function Login() {
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
+
+          <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+            <Link
+              to="/forgot-password"
+              style={{
+                color: "#6b7280",
+                textDecoration: "none",
+                fontSize: "0.875rem",
+              }}
+            >
+              Forgot password?
+            </Link>
+          </div>
         </form>
 
         {/* Sign up link */}
-        {/* <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center" }}>
           <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>
             Don't have an account?{" "}
             <Link
@@ -234,7 +253,7 @@ export default function Login() {
               Sign up
             </Link>
           </p>
-        </div> */}
+        </div>
 
         {/* Back to home */}
         <div style={{ textAlign: "center", marginTop: "1rem" }}>

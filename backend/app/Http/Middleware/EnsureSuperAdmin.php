@@ -6,12 +6,11 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureQueueMasterOrOwner
+class EnsureSuperAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $role = $request->user()?->role ?? null;
-        if (! in_array($role, ['owner', 'queue_master', 'superadmin'], true)) {
+        if ($request->user()?->role !== 'superadmin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 

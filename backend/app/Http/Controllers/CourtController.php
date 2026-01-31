@@ -19,26 +19,38 @@ class CourtController extends Controller
 
     public function index(Request $request)
     {
-        $courts = Court::where('owner_id', $request->user()->id)->get();
+        $user = $request->user();
+        $courts = $user->isSuperAdmin()
+            ? Court::with('owner:id,name,email')->get()
+            : Court::where('owner_id', $user->id)->get();
         return CourtResource::collection($courts);
     }
 
     public function store(StoreCourtRequest $request)
     {
+        $user = $request->user();
+        $ownerId = $user->id;
+
+        if ($user->isSuperAdmin() && $request->filled('owner_id')) {
+            $request->validate(['owner_id' => 'required|exists:users,id']);
+            $ownerId = $request->owner_id;
+        }
+
         $court = Court::create([
-            'owner_id' => $request->user()->id,
+            'owner_id' => $ownerId,
             'name' => $request->name,
             'hourly_rate' => $request->hourly_rate,
             'reservation_fee_percentage' => $request->reservation_fee_percentage ?? 0,
         ]);
 
-        return new CourtResource($court);
+        return new CourtResource($court->load('owner:id,name,email'));
     }
 
     public function update(UpdateCourtRequest $request, Court $court)
     {
-        // ownership check
-        abort_if($court->owner_id !== $request->user()->id, 403);
+        if (! $request->user()->isSuperAdmin() && $court->owner_id !== $request->user()->id) {
+            abort(403);
+        }
 
         $court->update($request->only(['name', 'is_active', 'hourly_rate', 'reservation_fee_percentage']));
         return new CourtResource($court);

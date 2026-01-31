@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\SuperAdminController;
 use App\Http\Controllers\CourtAvailabilityController;
 use App\Http\Controllers\CourtBookingController;
 use App\Http\Controllers\CourtController;
@@ -21,11 +22,23 @@ Route::get('/test', function () {
     ]);
 });
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// Rate limited auth routes (5 attempts per minute per IP)
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [\App\Http\Controllers\Api\PasswordResetController::class, 'forgot']);
+    Route::post('/reset-password', [\App\Http\Controllers\Api\PasswordResetController::class, 'reset']);
+});
 
-Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
-    return response()->json($request->user());
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/me', fn (Request $request) => response()->json($request->user()));
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+// Superadmin-only routes
+Route::middleware(['auth:sanctum', 'superadmin'])->prefix('admin')->group(function () {
+    Route::get('/users', [SuperAdminController::class, 'index']);
+    Route::post('/users', [SuperAdminController::class, 'store']);
 });
 
 Route::middleware(['auth:sanctum', 'owner'])->group(function () {
