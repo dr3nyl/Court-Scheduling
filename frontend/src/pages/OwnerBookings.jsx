@@ -576,38 +576,42 @@ export default function OwnerBookings() {
                   No availability set for this day. Set schedule in Court Schedule.
                 </p>
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                   <table
                     style={{
                       width: "100%",
                       tableLayout: "fixed",
                       borderCollapse: "collapse",
-                      minWidth: "320px",
+                      minWidth: isMobile ? "100%" : "320px",
                     }}
                   >
                     <thead>
                       <tr style={{ backgroundColor: "#f9fafb" }}>
                         <th
                           style={{
-                            padding: isMobile ? "0.75rem" : "1rem",
+                            padding: isMobile ? "0.5rem 0.75rem" : "1rem",
                             textAlign: "left",
                             fontSize: "0.875rem",
                             fontWeight: 600,
                             color: "#374151",
-                            width: "28%",
-                            minWidth: "140px",
+                            width: isMobile ? "10em" : "28%",
+                            minWidth: "10em",
+                            maxWidth: isMobile ? "10em" : "none",
+                            boxSizing: "border-box",
                           }}
                         >
                           Time
                         </th>
                         <th
                           style={{
-                            padding: isMobile ? "0.75rem" : "1rem",
+                            padding: isMobile ? "0.5rem 0.75rem" : "1rem",
                             textAlign: "left",
                             fontSize: "0.875rem",
                             fontWeight: 600,
                             color: "#374151",
-                            width: "72%",
+                            width: isMobile ? "auto" : "72%",
+                            minWidth: 0,
+                            boxSizing: "border-box",
                           }}
                         >
                         
@@ -626,20 +630,29 @@ export default function OwnerBookings() {
                           >
                             <td
                               style={{
-                                padding: isMobile ? "0.75rem" : "1rem",
+                                padding: isMobile ? "0.5rem 0.75rem" : "1rem",
                                 fontSize: "0.9rem",
                                 color: "#374151",
                                 verticalAlign: "middle",
                                 whiteSpace: "nowrap",
+                                width: isMobile ? "10em" : undefined,
+                                minWidth: "10em",
+                                maxWidth: isMobile ? "10em" : undefined,
+                                boxSizing: "border-box",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                               }}
                             >
                               {formatTime12(slot.start)} – {formatTime12(slot.end)}
                             </td>
                             <td
                               style={{
-                                padding: isMobile ? "0.75rem" : "1rem",
+                                padding: isMobile ? "0.5rem 0.75rem" : "1rem",
                                 verticalAlign: "middle",
-                                width: "72%",
+                                width: isMobile ? "auto" : "72%",
+                                minWidth: 0,
+                                boxSizing: "border-box",
+                                overflow: "hidden",
                               }}
                             >
                               {booking ? (
