@@ -14,12 +14,16 @@ class CourtBooking extends Model
         'end_time',
         'status',
         'shuttlecock_count',
+        'shuttlecock_cost',
         'started_at',
+        'ended_at',
         'payment_status',
     ];
 
     protected $casts = [
+        'shuttlecock_cost' => 'float',
         'started_at' => 'datetime',
+        'ended_at' => 'datetime',
     ];
 
     public function court()

@@ -22,7 +22,10 @@ export default function OwnerBookings() {
   const [selectedBooking, setSelectedBooking] = useState(null); // For detail modal
   const [scheduleBookingModal, setScheduleBookingModal] = useState(null); // { booking, slot, shuttlecockCount } for schedule grid card click
   const [startingSessionId, setStartingSessionId] = useState(null); // booking id while PATCH start session in progress
+  const [completingSessionId, setCompletingSessionId] = useState(null); // booking id while PATCH end session in progress
+  const [savingShuttlecockId, setSavingShuttlecockId] = useState(null); // booking id while PATCH shuttlecock only
   const [markingPaidId, setMarkingPaidId] = useState(null); // booking id while PATCH payment_status in progress
+  const [shuttlecockPrice, setShuttlecockPrice] = useState(null); // global price per shuttlecock (from /config)
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -96,10 +99,21 @@ export default function OwnerBookings() {
     }
   }, []);
 
+  const loadConfig = useCallback(async () => {
+    try {
+      const res = await api.get("/config");
+      const price = res.data?.shuttlecock_price;
+      setShuttlecockPrice(typeof price === "number" && price >= 0 ? price : null);
+    } catch {
+      setShuttlecockPrice(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadBookings();
     loadCourts();
-  }, [loadBookings, loadCourts]);
+    loadConfig();
+  }, [loadBookings, loadCourts, loadConfig]);
 
   // Auto-expand today and upcoming dates on load
   useEffect(() => {
@@ -241,7 +255,8 @@ export default function OwnerBookings() {
   const getBookingDisplayStatus = (booking) => {
     if (booking.status === "cancelled") return { label: "Cancelled", bg: "#fee2e2", color: "#b91c1c" };
     if (booking.started_at && booking.status === "confirmed") {
-      if (isSlotEnded(booking)) return { label: "Completed", bg: "#f3f4f6", color: "#6b7280" };
+      const isCompleted = booking.ended_at || isSlotEnded(booking);
+      if (isCompleted) return { label: "Completed", bg: "#f3f4f6", color: "#6b7280" };
       return { label: "Playing", bg: "#dbeafe", color: "#1d4ed8" };
     }
     if (booking.status === "confirmed") return { label: "Confirmed", bg: "#dcfce7", color: "#166534" };
@@ -679,7 +694,7 @@ export default function OwnerBookings() {
                                     <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
                                       {booking.payment_status === "paid" ? "Paid full" : "Reserved"}
                                     </span>
-                                    {isUpcoming(booking) && booking.status !== "cancelled" && (
+                                    {isUpcoming(booking) && booking.status !== "cancelled" && !booking.started_at && (
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -1007,7 +1022,7 @@ export default function OwnerBookings() {
                                                   >
                                                     {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                                                   </span>
-                                                  {isUpcoming(booking) && booking.status !== "cancelled" && (
+                                                  {isUpcoming(booking) && booking.status !== "cancelled" && !booking.started_at && (
                                                     <button
                                                       onClick={() => handleCancel(booking.id)}
                                                       disabled={cancellingId === booking.id}
@@ -1622,31 +1637,33 @@ export default function OwnerBookings() {
                 ×
               </button>
             </div>
-            <div style={{ marginBottom: "1rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
               <div style={{ fontWeight: 600, color: "#111827", marginBottom: "0.25rem" }}>
                 {scheduleBookingModal.booking.user?.name || "Guest"}
               </div>
-              <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: "0.25rem" }}>
+              <div style={{ fontSize: "0.9rem", color: "#6b7280", marginBottom: "0.5rem" }}>
                 {scheduleBookingModal.booking.court?.name} · {formatTime12(scheduleBookingModal.slot.start)} – {formatTime12(scheduleBookingModal.slot.end)}
               </div>
-              {(() => {
-                const statusStyle = getBookingDisplayStatus(scheduleBookingModal.booking);
-                return (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "0.2rem 0.5rem",
-                      borderRadius: "999px",
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                      backgroundColor: statusStyle.bg,
-                      color: statusStyle.color,
-                    }}
-                  >
-                    {statusStyle.label}
-                  </span>
-                );
-              })()}
+              <div style={{ display: "flex", alignItems: "center", marginTop: "0.25rem" }}>
+                {(() => {
+                  const statusStyle = getBookingDisplayStatus(scheduleBookingModal.booking);
+                  return (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "0.25rem 0.6rem",
+                        borderRadius: "999px",
+                        fontSize: "0.75rem",
+                        fontWeight: 500,
+                        backgroundColor: statusStyle.bg,
+                        color: statusStyle.color,
+                      }}
+                    >
+                      {statusStyle.label}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
             <div style={{ marginBottom: "1.25rem" }}>
               <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
@@ -1655,8 +1672,42 @@ export default function OwnerBookings() {
               {scheduleBookingModal.booking.payment_status === "paid" ? (
                 <span style={{ fontSize: "0.9rem", color: "#166534", fontWeight: 500 }}>Paid full</span>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>Reservation</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>Reservation fee only</span>
+                  {(() => {
+                    const b = scheduleBookingModal.booking;
+                    const court = courts.find((c) => c.id === b.court?.id);
+                    const hourlyRate = court?.hourly_rate != null ? parseFloat(court.hourly_rate) : 0;
+                    const pct = court?.reservation_fee_percentage != null ? parseFloat(court.reservation_fee_percentage) : 0;
+                    const start = (b.start_time || "").slice(0, 5);
+                    const end = (b.end_time || "").slice(0, 5);
+                    let remainingBalance = 0;
+                    if (hourlyRate > 0 && start && end) {
+                      const [sh, sm] = start.split(":").map(Number);
+                      const [eh, em] = end.split(":").map(Number);
+                      const durationHours = eh - sh + (em - sm) / 60;
+                      const total = durationHours * hourlyRate;
+                      const reservationFee = total * (pct / 100);
+                      remainingBalance = Math.max(0, total - reservationFee);
+                    }
+                    return remainingBalance > 0 ? (
+                      <div
+                        style={{
+                          fontSize: "0.875rem",
+                          color: "#374151",
+                          padding: "0.5rem 0.75rem",
+                          backgroundColor: "#fef3c7",
+                          borderRadius: "0.375rem",
+                          border: "1px solid #fde68a",
+                        }}
+                      >
+                        <strong>Remaining balance: ₱{remainingBalance.toFixed(2)}</strong>
+                        <span style={{ display: "block", marginTop: "0.25rem", color: "#92400e", fontSize: "0.8rem" }}>
+                          To be collected from the player at time of play.
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                   <button
                     type="button"
                     disabled={markingPaidId === scheduleBookingModal.booking.id}
@@ -1721,6 +1772,81 @@ export default function OwnerBookings() {
                   boxSizing: "border-box",
                 }}
               />
+              {(() => {
+                const raw = scheduleBookingModal.shuttlecockCount;
+                const count = typeof raw === "string" ? parseInt(raw, 10) : Number(raw);
+                const validCount = Number.isNaN(count) || count < 0 ? 0 : count;
+                const price = shuttlecockPrice != null && shuttlecockPrice >= 0 ? shuttlecockPrice : null;
+                const savedCost = scheduleBookingModal.booking.shuttlecock_cost;
+                const displayCost = savedCost != null ? savedCost : (validCount > 0 && price != null ? validCount * price : null);
+                if (validCount <= 0 && displayCost == null) return null;
+                return (
+                  <div
+                    style={{
+                      marginTop: "0.5rem",
+                      fontSize: "0.875rem",
+                      color: "#374151",
+                      padding: "0.5rem 0.75rem",
+                      backgroundColor: "#f0fdf4",
+                      borderRadius: "0.375rem",
+                      border: "1px solid #bbf7d0",
+                    }}
+                  >
+                    <strong>Additional payment (shuttlecocks):</strong> ₱{(displayCost ?? 0).toFixed(2)}
+                    {savedCost != null && (
+                      <span style={{ display: "block", marginTop: "0.25rem", color: "#166534", fontSize: "0.8rem" }}>
+                        Saved — to be collected from the player.
+                      </span>
+                    )}
+                    {savedCost == null && validCount > 0 && price != null && (
+                      <span style={{ display: "block", marginTop: "0.25rem", color: "#166534", fontSize: "0.8rem" }}>
+                        {validCount} × ₱{price.toFixed(2)} each — click Save to persist. To be collected from the player.
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+              <button
+                type="button"
+                disabled={savingShuttlecockId === scheduleBookingModal.booking.id}
+                onClick={async () => {
+                  const id = scheduleBookingModal.booking.id;
+                  const raw = scheduleBookingModal.shuttlecockCount;
+                  const parsed = raw === "" ? NaN : parseInt(raw, 10);
+                  const shuttlecockCount = Number.isNaN(parsed) || parsed < 0 ? null : parsed;
+                  setSavingShuttlecockId(id);
+                  try {
+                    const res = await api.patch(`/owner/bookings/${id}`, { shuttlecock_count: shuttlecockCount });
+                    const updated = res.data?.data ?? res.data;
+                    setScheduleBookingModal((prev) =>
+                      prev && prev.booking.id === id
+                        ? { ...prev, booking: { ...prev.booking, ...updated }, shuttlecockCount: updated?.shuttlecock_count ?? prev.shuttlecockCount }
+                        : null
+                    );
+                    loadBookings();
+                    toast.success("Shuttlecock count saved.");
+                  } catch (err) {
+                    console.error(err);
+                    toast.error(err?.response?.data?.message || "Failed to save shuttlecock count.");
+                  } finally {
+                    setSavingShuttlecockId(null);
+                  }
+                }}
+                style={{
+                  marginTop: "0.5rem",
+                  padding: "0.4rem 0.75rem",
+                  backgroundColor: savingShuttlecockId === scheduleBookingModal.booking.id ? "#9ca3af" : "#0ea5e9",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  cursor: savingShuttlecockId === scheduleBookingModal.booking.id ? "not-allowed" : "pointer",
+                  opacity: savingShuttlecockId === scheduleBookingModal.booking.id ? 0.8 : 1,
+                }}
+              >
+                {savingShuttlecockId === scheduleBookingModal.booking.id ? "Saving…" : "Save shuttlecock count"}
+              </button>
             </div>
             {scheduleBookingModal.booking.status === "confirmed" && !scheduleBookingModal.booking.started_at && (
               <button
@@ -1760,6 +1886,51 @@ export default function OwnerBookings() {
                 }}
               >
                 {startingSessionId === scheduleBookingModal.booking.id ? "Starting…" : "Start session"}
+              </button>
+            )}
+            {scheduleBookingModal.booking.status === "confirmed" &&
+              scheduleBookingModal.booking.started_at &&
+              !scheduleBookingModal.booking.ended_at && (
+              <button
+                type="button"
+                disabled={completingSessionId === scheduleBookingModal.booking.id}
+                onClick={async () => {
+                  const id = scheduleBookingModal.booking.id;
+                  const raw = scheduleBookingModal.shuttlecockCount;
+                  const parsed = raw === "" ? NaN : parseInt(raw, 10);
+                  const shuttlecockCount = Number.isNaN(parsed) || parsed < 0 ? null : parsed;
+                  setCompletingSessionId(id);
+                  try {
+                    await api.patch(`/owner/bookings/${id}`, {
+                      shuttlecock_count: shuttlecockCount,
+                      end_session: true,
+                    });
+                    setScheduleBookingModal((prev) =>
+                      prev ? { ...prev, booking: { ...prev.booking, ended_at: new Date().toISOString() } } : null
+                    );
+                    loadBookings();
+                  } catch (err) {
+                    console.error(err);
+                    toast.error(err?.response?.data?.message || "Failed to complete session. Please try again.");
+                  } finally {
+                    setCompletingSessionId(null);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem 1rem",
+                  marginTop: "0.5rem",
+                  backgroundColor: completingSessionId === scheduleBookingModal.booking.id ? "#9ca3af" : "#6366f1",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  cursor: completingSessionId === scheduleBookingModal.booking.id ? "not-allowed" : "pointer",
+                  opacity: completingSessionId === scheduleBookingModal.booking.id ? 0.8 : 1,
+                }}
+              >
+                {completingSessionId === scheduleBookingModal.booking.id ? "Completing…" : "Complete session"}
               </button>
             )}
           </div>
@@ -1998,7 +2169,7 @@ export default function OwnerBookings() {
                                               >
                                                 {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                                               </span>
-                                              {isUpcoming(booking) && booking.status !== "cancelled" && (
+                                              {isUpcoming(booking) && booking.status !== "cancelled" && !booking.started_at && (
                                                 <button
                                                   onClick={() => handleCancel(booking.id)}
                                                   disabled={cancellingId === booking.id}

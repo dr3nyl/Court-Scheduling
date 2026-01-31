@@ -41,6 +41,13 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('admin')->group(functi
     Route::post('/users', [SuperAdminController::class, 'store']);
 });
 
+// App config (e.g. shuttlecock price) - available to any authenticated user
+Route::middleware('auth:sanctum')->get('/config', function () {
+    return response()->json([
+        'shuttlecock_price' => config('court_scheduling.shuttlecock_price'),
+    ]);
+});
+
 Route::middleware(['auth:sanctum', 'owner'])->group(function () {
     Route::get('/courts', [CourtController::class, 'index']);
     Route::post('/courts', [CourtController::class, 'store']);

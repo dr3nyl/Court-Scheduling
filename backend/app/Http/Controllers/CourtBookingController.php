@@ -91,17 +91,26 @@ class CourtBookingController extends Controller
         $request->validate([
             'shuttlecock_count' => 'nullable|integer|min:0',
             'start_session' => 'nullable|boolean',
+            'end_session' => 'nullable|boolean',
             'payment_status' => 'nullable|in:reserved,paid',
         ]);
 
         if ($request->has('shuttlecock_count')) {
-            $booking->shuttlecock_count = $request->shuttlecock_count === '' || $request->shuttlecock_count === null
+            $count = $request->shuttlecock_count === '' || $request->shuttlecock_count === null
                 ? null
                 : (int) $request->shuttlecock_count;
+            $booking->shuttlecock_count = $count;
+            $booking->shuttlecock_cost = $count !== null && $count > 0
+                ? $count * config('court_scheduling.shuttlecock_price')
+                : null;
         }
 
         if ($request->boolean('start_session')) {
             $booking->started_at = $booking->started_at ?? Carbon::now();
+        }
+
+        if ($request->boolean('end_session')) {
+            $booking->ended_at = $booking->ended_at ?? Carbon::now();
         }
 
         if ($request->has('payment_status')) {
