@@ -13,6 +13,7 @@ use App\Models\QueueMatch;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class CourtBookingController extends Controller
 {
@@ -228,6 +229,21 @@ class CourtBookingController extends Controller
      */
     public function store(CreateBookingRequest $request, Court $court)
     {
+        // 0️⃣ Advance booking limit: date must be within allowed window (today through today + N-1 days)
+        $maxAdvanceDays = config('court_scheduling.advance_booking_days');
+        $today = Carbon::today()->toDateString();
+        $maxDate = Carbon::today()->addDays($maxAdvanceDays - 1)->toDateString();
+        if ($request->date < $today) {
+            throw ValidationException::withMessages([
+                'date' => ['Booking date cannot be in the past.'],
+            ]);
+        }
+        if ($request->date > $maxDate) {
+            throw ValidationException::withMessages([
+                'date' => ['You can only book up to ' . $maxAdvanceDays . ' days in advance.'],
+            ]);
+        }
+
         // 1️⃣ Check weekly availability
         $dayOfWeek = Carbon::parse($request->date)->dayOfWeek;
 

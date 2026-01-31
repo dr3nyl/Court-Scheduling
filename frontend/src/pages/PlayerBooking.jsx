@@ -6,20 +6,30 @@ import toast from "react-hot-toast";
 // Helper to get today's date in YYYY-MM-DD (for the date input)
 const todayString = () => new Date().toISOString().slice(0, 10);
 
-// Helper to build a small 7‑day "calendar strip"
-const buildNext7Days = () => {
+// Helper to get date string for today + n days (for max date)
+const addDaysString = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+// Helper to build "calendar strip" for the next N days (advance booking window)
+const buildNextDays = (maxDays) => {
   const days = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const count = Math.max(1, Math.min(maxDays, 14)); // clamp 1–14 for sanity
 
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    // Format date string manually to avoid timezone issues with toISOString()
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const day = d.getDate();
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     days.push({
       value: dateStr,
       label: d.toLocaleDateString(undefined, {
@@ -46,6 +56,7 @@ export default function PlayerBooking() {
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [paymentOption, setPaymentOption] = useState("full"); // "full" or "reservation"
   const [isMobile, setIsMobile] = useState(false);
+  const [advanceBookingDays, setAdvanceBookingDays] = useState(7); // max days ahead (from /config)
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -53,6 +64,27 @@ export default function PlayerBooking() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Load app config (advance booking limit) once
+  useEffect(() => {
+    api
+      .get("/config")
+      .then((res) => {
+        const n = res.data?.advance_booking_days;
+        if (typeof n === "number" && n >= 1) setAdvanceBookingDays(n);
+      })
+      .catch(() => {});
+  }, []);
+
+  const maxDateString = addDaysString(Math.max(0, advanceBookingDays - 1));
+
+  // Clamp selected date to advance booking window when config loads
+  useEffect(() => {
+    if (!date) return;
+    const today = todayString();
+    if (date < today) setDate(today);
+    else if (date > maxDateString) setDate(maxDateString);
+  }, [advanceBookingDays]); // eslint-disable-line react-hooks/exhaustive-deps -- clamp when advance window changes
 
   // Load available courts/slots whenever date changes
   useEffect(() => {
@@ -196,7 +228,7 @@ export default function PlayerBooking() {
     return slotTime < now;
   };
 
-  const days = buildNext7Days();
+  const days = buildNextDays(advanceBookingDays);
 
   // Filter courts if filter is set
   const filteredCourts = filterCourt === "all" 
@@ -598,6 +630,7 @@ export default function PlayerBooking() {
           type="date"
           value={date}
           min={todayString()}
+          max={maxDateString}
           onChange={(e) => {
             setDate(e.target.value);
             setError("");
