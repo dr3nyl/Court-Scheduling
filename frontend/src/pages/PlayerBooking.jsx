@@ -56,6 +56,7 @@ export default function PlayerBooking() {
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [paymentOption, setPaymentOption] = useState("full"); // "full" or "reservation"
   const [isMobile, setIsMobile] = useState(false);
+  const [bookingSuccessResult, setBookingSuccessResult] = useState(null); // { bookings: [...] } after successful booking
   const [advanceBookingDays, setAdvanceBookingDays] = useState(7); // max days ahead (from /config)
 
   useEffect(() => {
@@ -106,17 +107,18 @@ export default function PlayerBooking() {
   }, [date]);
 
   const handleBookClick = (courtId, slot, courtName, hourlyRate, reservationFeePercentage) => {
-    // Add slot to selected slots
     const slotKey = `${courtId}-${slot.start}-${slot.end}`;
     const isAlreadySelected = selectedSlots.some(
       (s) => `${s.courtId}-${s.slot.start}-${s.slot.end}` === slotKey
     );
 
     if (isAlreadySelected) {
-      // Remove if already selected
       setSelectedSlots(selectedSlots.filter((s) => `${s.courtId}-${s.slot.start}-${s.slot.end}` !== slotKey));
     } else {
-      // Add to selection - ensure numbers are parsed
+      if (selectedSlots.length > 0 && selectedSlots[0].courtId !== courtId) {
+        toast.error("You are selecting slots from different courts. Please use one court only.");
+        return;
+      }
       setSelectedSlots([
         ...selectedSlots,
         {
@@ -131,10 +133,18 @@ export default function PlayerBooking() {
   };
 
   const removeSelectedSlot = (index) => {
+    if (selectedSlots.length === 1) {
+      const ok = window.confirm("Remove selected slot?");
+      if (!ok) return;
+    }
     setSelectedSlots(selectedSlots.filter((_, i) => i !== index));
   };
 
   const clearSelectedSlots = () => {
+    if (selectedSlots.length > 1) {
+      const ok = window.confirm(`Clear selection? You have ${selectedSlots.length} slots selected.`);
+      if (!ok) return;
+    }
     setSelectedSlots([]);
     setSummaryModalOpen(false);
   };
@@ -179,7 +189,7 @@ export default function PlayerBooking() {
     setSuccess("");
 
     try {
-      // Create all bookings
+      // Create all bookings (backend re-validates availability per request)
       const bookingPromises = selectedSlots.map(({ courtId, slot }) =>
         api.post(`/courts/${courtId}/bookings`, {
           date,
@@ -189,18 +199,11 @@ export default function PlayerBooking() {
         })
       );
 
-      await Promise.all(bookingPromises);
+      const responses = await Promise.all(bookingPromises);
+      const createdBookings = responses.map((r) => r.data?.data ?? r.data);
 
-      const slotCount = selectedSlots.length;
-      setSuccess(
-        `${slotCount} booking${slotCount > 1 ? "s" : ""} confirmed! You can view ${slotCount > 1 ? "them" : "it"} in My Bookings.`
-      );
-
+      setBookingSuccessResult({ bookings: createdBookings });
       toast.success("Booking created successfully");
-      // Clear selections and close modal
-      setSelectedSlots([]);
-      setSummaryModalOpen(false);
-      setPaymentOption("full"); // Reset payment option
 
       // Refresh slots so newly booked slots become unavailable
       try {
@@ -212,11 +215,18 @@ export default function PlayerBooking() {
     } catch (err) {
       console.error(err);
       const backendMessage =
-        err?.response?.data?.message || "Booking failed. Please try again.";
+        err?.response?.data?.message || err?.response?.data?.errors?.date?.[0] || "Booking failed. Slot may have been taken. Please try again.";
       setError(backendMessage);
     } finally {
       setBookingLoading(false);
     }
+  };
+
+  const closeBookingSuccess = () => {
+    setBookingSuccessResult(null);
+    setSelectedSlots([]);
+    setSummaryModalOpen(false);
+    setPaymentOption("full");
   };
 
   const isSlotInPast = (slot) => {
@@ -251,7 +261,7 @@ export default function PlayerBooking() {
       </div>
 
       {/* Summary Modal */}
-      {summaryModalOpen && selectedSlots.length > 0 && (
+      {summaryModalOpen && (selectedSlots.length > 0 || bookingSuccessResult) && (
         <div
           style={{
             position: "fixed",
@@ -266,7 +276,7 @@ export default function PlayerBooking() {
             zIndex: 1000,
             padding: isMobile ? "0.5rem" : undefined,
           }}
-          onClick={() => setSummaryModalOpen(false)}
+          onClick={() => (bookingSuccessResult ? closeBookingSuccess() : setSummaryModalOpen(false))}
         >
           <div
             style={{
@@ -281,6 +291,70 @@ export default function PlayerBooking() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Post-booking success panel */}
+            {bookingSuccessResult ? (
+              <>
+                <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>✓</div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#166534", marginBottom: "0.25rem" }}>
+                    Booking confirmed!
+                  </h3>
+                  <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+                    Confirmation sent via email / in-app
+                  </p>
+                </div>
+                <div
+                  style={{
+                    padding: "1rem",
+                    backgroundColor: "#f0fdf4",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #bbf7d0",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#166534", marginBottom: "0.5rem" }}>
+                    Booking reference{bookingSuccessResult.bookings?.length > 1 ? "s" : ""}
+                  </div>
+                  <div style={{ fontSize: "0.9rem", color: "#374151", fontFamily: "monospace" }}>
+                    {bookingSuccessResult.bookings?.map((b) => `#${b.id}`).join(", ") ?? "-"}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: "1rem",
+                    backgroundColor: "#f9fafb",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e5e7eb",
+                    marginBottom: "1.5rem",
+                    fontSize: "0.9rem",
+                    color: "#374151",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>At the venue</div>
+                  <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+                    <li>Show your booking reference or name to staff</li>
+                    <li>Arrive 5–10 minutes before your slot</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={closeBookingSuccess}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem 1rem",
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <>
             <h3 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#111827" }}>
               Review & Book
             </h3>
@@ -316,6 +390,9 @@ export default function PlayerBooking() {
                         <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.9rem" }}>
                           {item.courtName}
                         </div>
+                        <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "0.15rem" }}>
+                          Indoor · Rubber floor
+                        </div>
                         <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "0.25rem" }}>
                           {new Date(date).toLocaleDateString(undefined, {
                             weekday: "short",
@@ -332,9 +409,10 @@ export default function PlayerBooking() {
                       </div>
                       <button
                         onClick={() => removeSelectedSlot(index)}
+                        title="Remove this slot"
                         style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: "#fee2e2",
+                          padding: "0.35rem 0.5rem",
+                          backgroundColor: "#fef2f2",
                           color: "#991b1b",
                           border: "1px solid #fecaca",
                           borderRadius: "0.25rem",
@@ -342,7 +420,6 @@ export default function PlayerBooking() {
                           fontSize: "0.75rem",
                           fontWeight: 500,
                         }}
-                        title="Remove"
                       >
                         ✕
                       </button>
@@ -486,7 +563,38 @@ export default function PlayerBooking() {
               );
             })()}
 
-            {/* Action Buttons */}
+            {/* Cancellation policy */}
+            <div
+              style={{
+                padding: "0.75rem 1rem",
+                backgroundColor: "#fffbeb",
+                borderRadius: "0.5rem",
+                border: "1px solid #fde68a",
+                marginBottom: "1.5rem",
+                fontSize: "0.85rem",
+                color: "#92400e",
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>Cancellation policy</div>
+              <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+                <li>Reservation or full payment is non-refundable</li>
+              </ul>
+            </div>
+
+            {/* Payment methods */}
+            <div style={{ marginBottom: "1rem", fontSize: "0.85rem", color: "#6b7280" }}>
+              <span style={{ marginRight: "0.5rem" }}>Pay at venue:</span>
+              <span style={{ fontWeight: 500, color: "#374151" }}>GCash</span>
+              <span style={{ margin: "0 0.35rem" }}>·</span>
+              <span style={{ fontWeight: 500, color: "#374151" }}>Maya</span>
+            </div>
+
+            {/* Action Buttons + Instant confirmation */}
+            <div style={{ marginBottom: "0.75rem", fontSize: "0.8rem", color: "#6b7280", display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span>⚡ Instant confirmation</span>
+              <span>·</span>
+              <span>📩 Confirmation sent via email / in-app</span>
+            </div>
             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
               <button
                 onClick={() => setSummaryModalOpen(false)}
@@ -521,6 +629,8 @@ export default function PlayerBooking() {
                 {bookingLoading ? "Booking..." : "Confirm Booking"}
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -694,17 +804,24 @@ export default function PlayerBooking() {
         </div>
       </div>
 
-      {/* Review & Book Button */}
+      {/* Spacer for fixed mobile CTA so content isn't hidden behind it */}
+      {selectedSlots.length > 0 && isMobile && <div style={{ height: "80px" }} aria-hidden />}
+
+      {/* Review & Book Button - sticky bottom on mobile */}
       {selectedSlots.length > 0 && (
         <div
           style={{
-            position: "sticky",
+            position: isMobile ? "fixed" : "sticky",
             bottom: 0,
+            left: isMobile ? 0 : undefined,
+            right: isMobile ? 0 : undefined,
+            width: isMobile ? "100%" : undefined,
             backgroundColor: "#ffffff",
             borderTop: "2px solid #e5e7eb",
-            padding: "1rem",
-            marginTop: "1.5rem",
-            borderRadius: "0.75rem 0.75rem 0 0",
+            padding: isMobile ? "0.75rem 1rem" : "1rem",
+            paddingBottom: isMobile ? "max(0.75rem, env(safe-area-inset-bottom))" : "1rem",
+            marginTop: isMobile ? 0 : "1.5rem",
+            borderRadius: isMobile ? 0 : "0.75rem 0.75rem 0 0",
             boxShadow: "0 -4px 6px rgba(0,0,0,0.1)",
             zIndex: 100,
           }}
@@ -714,38 +831,106 @@ export default function PlayerBooking() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem",
+              flexWrap: "nowrap",
+              gap: isMobile ? "0.75rem" : "1rem",
+              maxWidth: isMobile ? "100%" : undefined,
             }}
           >
-            <div>
-              <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.95rem" }}>
-                {selectedSlots.length} slot{selectedSlots.length > 1 ? "s" : ""} selected
-              </div>
-              {(() => {
-                const { total } = calculateCosts();
-                return (
-                  <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "0.25rem" }}>
-                    Total: ₱{total.toFixed(2)}
+            <div
+              style={{
+                flex: isMobile ? "1" : undefined,
+                minWidth: 0,
+                overflow: "hidden",
+                display: isMobile ? "flex" : "block",
+                alignItems: "center",
+                flexWrap: "nowrap",
+                gap: isMobile ? "0.35rem" : undefined,
+              }}
+            >
+              {isMobile ? (
+                (() => {
+                  const timeRange = selectedSlots
+                    .map((s) => `${s.slot.start}–${s.slot.end}`)
+                    .join(", ");
+                  let totalHours = 0;
+                  selectedSlots.forEach(({ slot }) => {
+                    const start = new Date(`2000-01-01 ${slot.start}`);
+                    const end = new Date(`2000-01-01 ${slot.end}`);
+                    totalHours += (end - start) / (1000 * 60 * 60);
+                  });
+                  const hrsLabel = totalHours === 1 ? "1 hr" : `${totalHours} hrs`;
+                  const { total } = calculateCosts();
+                  return (
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#374151",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={`${selectedSlots[0]?.courtName ?? "Court"} · ${timeRange} (${hrsLabel}) · ₱${total.toFixed(2)}`}
+                    >
+                      {selectedSlots[0]?.courtName ?? "Court"} · {timeRange} ({hrsLabel}) · ₱{total.toFixed(2)}
+                    </span>
+                  );
+                })()
+              ) : (
+                <>
+                  <div style={{ fontWeight: 600, color: "#111827", fontSize: "0.95rem" }}>
+                    {selectedSlots[0]?.courtName ?? "Court"}
                   </div>
-                );
-              })()}
+                  {(() => {
+                    const timeRange = selectedSlots
+                      .map((s) => `${s.slot.start}–${s.slot.end}`)
+                      .join(" · ");
+                    let totalHours = 0;
+                    selectedSlots.forEach(({ slot }) => {
+                      const start = new Date(`2000-01-01 ${slot.start}`);
+                      const end = new Date(`2000-01-01 ${slot.end}`);
+                      totalHours += (end - start) / (1000 * 60 * 60);
+                    });
+                    const hrsLabel = totalHours === 1 ? "1 hr" : `${totalHours} hrs`;
+                    const { total } = calculateCosts();
+                    const isBackToBack = selectedSlots.length > 1 && selectedSlots.every((s, i) => {
+                      if (i === 0) return true;
+                      const prevEnd = selectedSlots[i - 1].slot.end;
+                      return s.slot.start === prevEnd;
+                    });
+                    return (
+                      <>
+                        <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "0.25rem" }}>
+                          {timeRange} ({hrsLabel})
+                          {isBackToBack && (
+                            <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", backgroundColor: "#e0e7ff", color: "#3730a3", padding: "0.1rem 0.4rem", borderRadius: "999px" }}>
+                              Back-to-back
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#111827", marginTop: "0.25rem" }}>
+                          Total: ₱{total.toFixed(2)}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
             </div>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "nowrap", alignItems: "center", flexShrink: 0 }}>
               <button
                 onClick={clearSelectedSlots}
                 style={{
-                  padding: "0.5rem 1rem",
+                  padding: "0.5rem 0.75rem",
                   backgroundColor: "#f3f4f6",
-                  color: "#374151",
-                  border: "none",
+                  color: "#6b7280",
+                  border: "1px solid #e5e7eb",
                   borderRadius: "0.5rem",
                   cursor: "pointer",
                   fontWeight: 500,
-                  fontSize: "0.9rem",
+                  fontSize: "0.85rem",
                 }}
               >
-                Clear
+                Clear selection
               </button>
               <button
                 onClick={() => setSummaryModalOpen(true)}
@@ -922,9 +1107,12 @@ export default function PlayerBooking() {
                     backgroundColor: "#ffffff",
                   }}
                 >
-                  <h3 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, marginBottom: "0.5rem", color: "#111827" }}>
+                  <h3 style={{ fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 600, marginBottom: "0.25rem", color: "#111827" }}>
                     {court.name}
                   </h3>
+                  <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: "1rem" }}>
+                    Select a time slot
+                  </p>
                   <p
                     style={{
                       fontSize: "0.9rem",
@@ -954,6 +1142,11 @@ export default function PlayerBooking() {
                               const isSelected = selectedSlots.some(
                                 (s) => `${s.courtId}-${s.slot.start}-${s.slot.end}` === slotKey
                               );
+                              const start = new Date(`2000-01-01 ${slot.start}`);
+                              const end = new Date(`2000-01-01 ${slot.end}`);
+                              const hours = (end - start) / (1000 * 60 * 60);
+                              const rate = typeof court.hourly_rate === "number" ? court.hourly_rate : parseFloat(court.hourly_rate) || 0;
+                              const slotPrice = hours * rate;
 
                               return (
                                 <button
@@ -973,9 +1166,9 @@ export default function PlayerBooking() {
                                   style={{
                                     padding: "0.5rem 0.75rem",
                                     borderRadius: "0.5rem",
-                                    border: isSelected ? "2px solid #2563eb" : "1px solid #16a34a",
-                                    backgroundColor: isSelected ? "#dbeafe" : "#dcfce7",
-                                    color: isSelected ? "#1e40af" : "#166534",
+                                    border: isSelected ? "2px solid #2563eb" : "2px solid #16a34a",
+                                    backgroundColor: isSelected ? "#2563eb" : "transparent",
+                                    color: isSelected ? "#ffffff" : "#166534",
                                     fontSize: isMobile ? "0.85rem" : "0.85rem",
                                     fontWeight: 500,
                                     cursor: bookingLoading ? "not-allowed" : "pointer",
@@ -983,15 +1176,19 @@ export default function PlayerBooking() {
                                     transition: "all 0.2s",
                                     width: isMobile ? "100%" : undefined,
                                     position: "relative",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    minWidth: "5rem",
                                   }}
                                   onMouseEnter={(e) => {
                                     if (!bookingLoading) {
-                                      e.currentTarget.style.backgroundColor = isSelected ? "#bfdbfe" : "#bbf7d0";
+                                      e.currentTarget.style.backgroundColor = isSelected ? "#1d4ed8" : "#f0fdf4";
                                       e.currentTarget.style.transform = "translateY(-1px)";
                                     }
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = isSelected ? "#dbeafe" : "#dcfce7";
+                                    e.currentTarget.style.backgroundColor = isSelected ? "#2563eb" : "transparent";
                                     e.currentTarget.style.transform = "translateY(0)";
                                   }}
                                 >
@@ -999,24 +1196,21 @@ export default function PlayerBooking() {
                                     <span
                                       style={{
                                         position: "absolute",
-                                        top: "-0.25rem",
-                                        right: "-0.25rem",
-                                        backgroundColor: "#2563eb",
+                                        top: "0.25rem",
+                                        right: "0.25rem",
                                         color: "#ffffff",
-                                        borderRadius: "50%",
-                                        width: "1.25rem",
-                                        height: "1.25rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.7rem",
-                                        fontWeight: 600,
+                                        fontSize: "0.75rem",
                                       }}
                                     >
                                       ✓
                                     </span>
                                   )}
-                                  {slot.start} – {slot.end}
+                                  <span>{slot.start} – {slot.end}</span>
+                                  {rate > 0 && (
+                                    <span style={{ fontSize: "0.75rem", marginTop: "0.15rem", opacity: isSelected ? 0.9 : 0.85 }}>
+                                      ₱{slotPrice.toFixed(0)}
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })}
@@ -1024,7 +1218,7 @@ export default function PlayerBooking() {
                         </div>
                       )}
 
-                      {/* Booked slots (grayed out) */}
+                      {/* Booked slots (light gray + lock) */}
                       {bookedSlots.length > 0 && (
                         <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e5e7eb" }}>
                           <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginBottom: "0.5rem" }}>
@@ -1043,12 +1237,16 @@ export default function PlayerBooking() {
                                 style={{
                                   padding: "0.5rem 0.75rem",
                                   borderRadius: "0.5rem",
-                                  border: "1px solid #d1d5db",
-                                  backgroundColor: "#f9fafb",
+                                  border: "1px solid #e5e7eb",
+                                  backgroundColor: "#f3f4f6",
                                   color: "#9ca3af",
                                   fontSize: "0.85rem",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.35rem",
                                 }}
                               >
+                                <span aria-hidden>🔒</span>
                                 {slot.start} – {slot.end}
                               </span>
                             ))}
