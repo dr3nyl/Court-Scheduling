@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import api from "../services/api";
@@ -157,40 +157,43 @@ export default function PlayerBookings() {
     return timeString.slice(0, 5);
   };
 
-  const isUpcoming = (booking) => {
+  const isUpcoming = useCallback((booking) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const bookingDate = new Date(booking.date);
     bookingDate.setHours(0, 0, 0, 0);
     return bookingDate >= today && booking.status === "confirmed";
-  };
+  }, []);
 
-  const isPast = (booking) => {
+  const isPast = useCallback((booking) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const bookingDate = new Date(booking.date);
     bookingDate.setHours(0, 0, 0, 0);
     return bookingDate < today || booking.status === "cancelled";
-  };
+  }, []);
 
-  const isToday = (dateString) => {
+  const isToday = useCallback((dateString) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const date = new Date(dateString);
     date.setHours(0, 0, 0, 0);
     return date.getTime() === today.getTime();
-  };
+  }, []);
 
   // Status for a date group: Today | Upcoming | Past | Cancelled
-  const getDateStatus = (dateBookings) => {
-    const allCancelled = dateBookings.every((b) => b.status === "cancelled");
-    if (allCancelled) return "cancelled";
-    if (dateBookings.some((b) => isToday(b.date))) {
-      const hasUpcoming = dateBookings.some(isUpcoming);
-      return hasUpcoming ? "today" : "past";
-    }
-    return dateBookings.some(isUpcoming) ? "upcoming" : "past";
-  };
+  const getDateStatus = useCallback(
+    (dateBookings) => {
+      const allCancelled = dateBookings.every((b) => b.status === "cancelled");
+      if (allCancelled) return "cancelled";
+      if (dateBookings.some((b) => isToday(b.date))) {
+        const hasUpcoming = dateBookings.some(isUpcoming);
+        return hasUpcoming ? "today" : "past";
+      }
+      return dateBookings.some(isUpcoming) ? "upcoming" : "past";
+    },
+    [isUpcoming, isToday]
+  );
 
   const groupBookingsByDate = (bookingsList) => {
     const grouped = {};
@@ -304,7 +307,7 @@ export default function PlayerBookings() {
         dateStatus: getDateStatus(dateBookings),
       };
     });
-  }, [filteredBookings, filter, dateSearch, datePickerValue, thisWeekOnly]);
+  }, [filteredBookings, filter, dateSearch, datePickerValue, thisWeekOnly, getDateStatus]);
 
   const toggleDate = (dateStr) => {
     const newExpanded = new Set(expandedDates);
