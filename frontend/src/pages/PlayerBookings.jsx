@@ -241,7 +241,7 @@ export default function PlayerBookings() {
       if (filter === "cancelled") return booking.status === "cancelled";
       return true; // 'all'
     });
-  }, [bookings, filter]);
+  }, [bookings, filter, isUpcoming, isPast]);
 
   const groupedBookings = useMemo(() => {
     const grouped = groupBookingsByDate(filteredBookings);
@@ -307,7 +307,7 @@ export default function PlayerBookings() {
         dateStatus: getDateStatus(dateBookings),
       };
     });
-  }, [filteredBookings, filter, dateSearch, datePickerValue, thisWeekOnly, getDateStatus]);
+  }, [filteredBookings, filter, dateSearch, datePickerValue, thisWeekOnly, getDateStatus, isUpcoming]);
 
   const toggleDate = (dateStr) => {
     const newExpanded = new Set(expandedDates);
