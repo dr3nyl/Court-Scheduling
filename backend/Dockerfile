@@ -4,11 +4,19 @@ FROM php:8.2-cli
 WORKDIR /var/www
 
 # Install system deps and PHP extensions required by Laravel
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git unzip curl libzip-dev libpng-dev libpq-dev libonig-dev libxml2-dev \
-    libmysqlclient-dev \
-    && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring xml zip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        unzip \
+        curl \
+        libzip-dev \
+        libpng-dev \
+        libpq-dev \
+        libonig-dev \
+        libxml2-dev \
+    && docker-php-ext-install -j$(nproc) pdo_pgsql mbstring xml zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
