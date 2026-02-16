@@ -10,21 +10,14 @@ RUN apt-get update \
         unzip \
         curl \
         libzip-dev \
-        libpng-dev \
         libpq-dev \
         libonig-dev \
         libxml2-dev \
-        zlib1g-dev \
-        libicu-dev \
-        gnupg \
-        ca-certificates \
-    && docker-php-ext-configure zip --with-zip \
     && docker-php-ext-install -j$(nproc) \
         pdo_pgsql \
         mbstring \
         xml \
         zip \
-        intl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
