@@ -1,0 +1,17 @@
+/node_modules
+/vendor
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.md
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+.phpunit.result.cache
+Dockerfile
+docker-compose*
+.dockerignore

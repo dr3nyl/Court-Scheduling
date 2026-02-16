@@ -1,43 +1,64 @@
-version: "3.8"
+# Court Scheduling - Docker Compose for Ubuntu / EC2
+# Usage:
+#   Local:  docker compose up -d
+#   EC2:    Set REACT_APP_API_URL to your backend URL (e.g. http://YOUR_EC2_IP:8000/api)
+#           then: docker compose build --build-arg REACT_APP_API_URL=http://YOUR_EC2_IP:8000/api && docker compose up -d
 
 services:
   backend:
     build: ./backend
     container_name: court_backend
-    volumes:
-      - ./backend:/var/www
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    command: php artisan serve --host=0.0.0.0 --port=8000
     environment:
+      APP_NAME: "Court Scheduling"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
-      DB_DATABASE: court_scheduling
-      DB_USERNAME: postgres
-      DB_PASSWORD: secret
+      DB_DATABASE: ${DB_DATABASE:-court_scheduling}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000/api}
     container_name: court_frontend
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
       - backend
 
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: court_db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: court_scheduling
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ${DB_DATABASE:-court_scheduling}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-court_scheduling}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
