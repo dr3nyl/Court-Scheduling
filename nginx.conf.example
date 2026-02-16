@@ -1,0 +1,58 @@
+# Nginx configuration for EC2 production deployment
+# Place this in /etc/nginx/sites-available/default (or your site config)
+# Then: sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name _;  # Replace with your domain name (e.g., example.com)
+
+    # Increase timeouts for API calls
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+
+    # Frontend (React) - serve static files or proxy
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Handle WebSocket connections if needed
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Backend API
+    location /api/ {
+        # Remove /api prefix when forwarding to backend
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        
+        # CORS headers (if not handled by Laravel)
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+        
+        # Handle preflight requests
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
