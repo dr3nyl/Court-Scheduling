@@ -1,0 +1,47 @@
+# Alternative Alpine-based Dockerfile for Railway (smaller, faster builds)
+FROM php:8.2-cli-alpine
+
+WORKDIR /var/www
+
+# Install system dependencies and PHP extension dependencies (Alpine uses apk)
+RUN apk add --no-cache \
+    git \
+    unzip \
+    curl \
+    postgresql-dev \
+    libzip-dev \
+    libpng-dev \
+    oniguruma-dev \
+    libxml2-dev
+
+# Install PHP extensions
+RUN docker-php-ext-install -j$(nproc) \
+    pdo_pgsql \
+    mbstring \
+    xml \
+    zip
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Application code
+COPY . .
+
+# Ensure .env exists
+RUN test -f .env || cp .env.example .env
+
+# Install PHP dependencies
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist \
+    && composer dump-autoload --optimize
+
+# Create storage/cache dirs and set permissions
+RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
+
+EXPOSE 8000
+
+# Entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

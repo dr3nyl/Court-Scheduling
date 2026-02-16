@@ -3,7 +3,7 @@ FROM php:8.2-cli
 
 WORKDIR /var/www
 
-# Install system deps and PHP extensions required by Laravel
+# Install system dependencies and PHP extension dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
@@ -14,7 +14,12 @@ RUN apt-get update \
         libpq-dev \
         libonig-dev \
         libxml2-dev \
-    && docker-php-ext-install -j$(nproc) pdo_pgsql mbstring xml zip \
+    && docker-php-ext-configure zip --with-zip \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_pgsql \
+        mbstring \
+        xml \
+        zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
