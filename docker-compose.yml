@@ -9,8 +9,8 @@ services:
     build: ./backend
     container_name: court_backend
     restart: unless-stopped
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     environment:
       APP_NAME: "Court Scheduling"
       APP_ENV: production
