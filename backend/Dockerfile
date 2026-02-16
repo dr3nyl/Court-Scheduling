@@ -6,7 +6,8 @@ WORKDIR /var/www
 # Install system deps and PHP extensions required by Laravel
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip curl libzip-dev libpng-dev libpq-dev libonig-dev libxml2-dev \
-    && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring xml bcmath ctype tokenizer fileinfo zip \
+    libmysqlclient-dev \
+    && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring xml zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Composer
