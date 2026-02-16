@@ -14,12 +14,17 @@ RUN apt-get update \
         libpq-dev \
         libonig-dev \
         libxml2-dev \
+        zlib1g-dev \
+        libicu-dev \
+        gnupg \
+        ca-certificates \
     && docker-php-ext-configure zip --with-zip \
     && docker-php-ext-install -j$(nproc) \
         pdo_pgsql \
         mbstring \
         xml \
         zip \
+        intl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,10 +34,10 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Application code (use .dockerignore to exclude vendor, node_modules, .env)
 COPY . .
 
-# Ensure .env exists (Laravel needs it; real values come from Docker env)
+# Ensure .env exists
 RUN test -f .env || cp .env.example .env
 
-# Install PHP dependencies (no dev for smaller image; use composer install for dev)
+# Install PHP dependencies
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist \
     && composer dump-autoload --optimize
 
