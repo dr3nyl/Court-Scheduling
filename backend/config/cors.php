@@ -20,7 +20,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://52.76.36.179',
+        'http://drpsystems.org',
     ],
 
     'allowed_origins_patterns' => [
