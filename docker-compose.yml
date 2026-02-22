@@ -34,7 +34,7 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000/api}
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://52.76.36.179:8000/api}
     container_name: court_frontend
     restart: unless-stopped
     ports:
