@@ -20,7 +20,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://badminton-scheduling.vercel.app',
+        'http://52.76.36.179',
     ],
 
     'allowed_origins_patterns' => [
