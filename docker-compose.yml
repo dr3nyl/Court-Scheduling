@@ -26,6 +26,8 @@ services:
       SESSION_DRIVER: database
       CACHE_STORE: database
       QUEUE_CONNECTION: database
+    volumes:
+      - ./backend/.env:/var/www/.env
     depends_on:
       db:
         condition: service_healthy
