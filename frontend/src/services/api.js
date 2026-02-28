@@ -1,7 +1,15 @@
 import axios from "axios";
 
+// Use relative /api in production (same-origin) to avoid mixed content when served over HTTPS.
+// Only use explicit localhost URL when developing locally.
+const baseURL =
+  process.env.REACT_APP_API_URL ||
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? "/api"
+    : "http://localhost:8000/api");
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000/api",
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
