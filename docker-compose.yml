@@ -36,7 +36,7 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_API_URL: http://drpsystems.org/api
+        REACT_APP_API_URL: https://drpsystems.org/api
     container_name: court_frontend
     restart: unless-stopped
     ports:

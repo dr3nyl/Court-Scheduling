@@ -21,6 +21,7 @@ return [
 
     'allowed_origins' => [
         'http://drpsystems.org',
+        'https://drpsystems.org',
     ],
 
     'allowed_origins_patterns' => [
